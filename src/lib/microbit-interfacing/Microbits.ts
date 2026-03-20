@@ -262,7 +262,7 @@ class Microbits {
    * Attempt to disconnect a USB-connected microbit
    */
   public static async unlinkMicrobit() {
-    this.getLinked().getUsbController().disconnect();
+    await this.getLinked().getUsbController().disconnect();
   }
 
   /**

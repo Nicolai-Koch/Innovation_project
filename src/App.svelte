@@ -41,6 +41,9 @@
   import { stores } from './lib/stores/Stores';
   import { DeviceRequestStates } from './lib/domain/Devices';
   import { isLoading } from './lib/stores/ApplicationState';
+  import JacdacConnectButton from './lib/jacdac/ConnectButton.svelte';
+  import JacdacButtonMonitor from './lib/jacdac/ButtonMonitor.svelte';
+  import JacdacDevices from './lib/jacdac/Devices.svelte';
 
   const devices = stores.getDevices();
 
@@ -73,6 +76,13 @@
       <CookieBanner />
       <OverlayView />
       <BluetoothIncompatibilityWarningDialog />
+      
+      <!-- JACDAC CONNECTION BUTTON (optional, can be moved to a specific page) -->
+      <div class="absolute top-4 right-4 z-50">
+        <JacdacConnectButton />
+        <JacdacButtonMonitor />
+        <JacdacDevices />
+      </div>
 
       <!-- SIDE BAR -->
       <MediaQuery query="(max-width: 1500px)" let:matches={isSmall}>
