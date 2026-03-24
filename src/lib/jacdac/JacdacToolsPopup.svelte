@@ -1,15 +1,25 @@
 <script lang="ts">
-  import { SRV_LED } from 'jacdac-ts';
+  import { SRV_ILLUMINANCE, SRV_LED, SRV_LIGHT_LEVEL } from 'jacdac-ts';
   import type { JDService } from 'jacdac-ts';
   import BaseDialog from '../../components/ui/dialogs/BaseDialog.svelte';
   import { devices as jacdacDevices, connected } from './stores';
   import ButtonMonitor from './ButtonMonitor.svelte';
   import LedRing from './LedRing.svelte';
+  import LightSensorLedAutomation from './LightSensorLedAutomation.svelte';
 
   let isOpen = false;
 
   $: ledServices = $jacdacDevices.flatMap((device) =>
     device.services().filter((service: JDService) => service.serviceClass === SRV_LED)
+  );
+
+  $: lightServices = $jacdacDevices.flatMap((device) =>
+    device
+      .services()
+      .filter(
+        (service: JDService) =>
+          service.serviceClass === SRV_LIGHT_LEVEL || service.serviceClass === SRV_ILLUMINANCE
+      )
   );
 </script>
 
@@ -47,6 +57,17 @@
               </div>
             {/each}
           </div>
+        {/if}
+      </section>
+
+      <section class="section">
+        <h3>Light sensor -> LED ring</h3>
+        {#if lightServices.length === 0}
+          <p class="empty-message">No light sensor service detected on the Jacdac bus.</p>
+        {:else if ledServices.length === 0}
+          <p class="empty-message">Connect an LED ring service to use this automation.</p>
+        {:else}
+          <LightSensorLedAutomation {lightServices} {ledServices} />
         {/if}
       </section>
     </div>
