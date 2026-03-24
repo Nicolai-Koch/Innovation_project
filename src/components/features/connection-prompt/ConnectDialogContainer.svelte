@@ -80,7 +80,7 @@
       <ConnectSameDialog
         onConnectSameClick={connectSame}
         onConnectDifferentClick={() =>
-          ($connectionDialogState.connectionState = ConnectDialogStates.START)} />
+          ($connectionDialogState.connectionState = ConnectDialogStates.BLUETOOTH)} />
     {:else if $connectionDialogState.connectionState === ConnectDialogStates.BLUETOOTH}
       <BluetoothConnectDialog
         onBluetoothConnected={() => {

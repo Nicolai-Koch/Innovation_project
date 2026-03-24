@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { connected, error, initializeBus, connectToBus, disconnectFromBus } from './stores';
 
+  export let compact = false;
+
   let isConnecting = false;
   let errorMessage: string | null = null;
   let initialized = false;
@@ -48,23 +50,25 @@
     class="connect-button"
     class:connected={$connected}
   >
-    {isConnecting ? 'Connecting...' : $connected ? 'Disconnect' : 'Connect'}
+    {isConnecting ? 'Connecting...' : $connected ? 'Jacdac connected' : 'Connect Jacdac'}
   </button>
 
-  {#if errorMessage}
+  {#if errorMessage && !compact}
     <div class="error-message">
       <strong>Error:</strong> {errorMessage}
     </div>
   {/if}
 
-  {#if $connected}
-    <div class="status-message success">
-      Connected to Jacdac Bus
-    </div>
-  {:else}
-    <div class="status-message">
-      Not connected
-    </div>
+  {#if !compact}
+    {#if $connected}
+      <div class="status-message success">
+        Connected to Jacdac Bus
+      </div>
+    {:else}
+      <div class="status-message">
+        Not connected
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -73,12 +77,12 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    margin: 1rem 0;
+    margin: 0;
   }
 
   .connect-button {
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
     border: 2px solid #ccc;
     border-radius: 4px;
     background: white;

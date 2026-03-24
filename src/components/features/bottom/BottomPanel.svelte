@@ -20,6 +20,8 @@
   import LiveDataFingerprint from './LiveDataFingerprint.svelte';
   import { Feature, hasFeature } from '../../../lib/FeatureToggles';
   import Switch from '../../ui/Switch.svelte';
+  import JacdacConnectButton from '../../../lib/jacdac/ConnectButton.svelte';
+  import JacdacToolsPopup from '../../../lib/jacdac/JacdacToolsPopup.svelte';
 
   const devices = stores.getDevices();
   const enableFingerprint = stores.getEnableFingerprint();
@@ -51,9 +53,13 @@
   {#if !$devices.isInputAssigned}
     <!-- No input microbit assigned -->
     <div class="h-full w-full flex justify-center items-center bg-white">
-      <StandardButton onClick={connectButtonClicked}>
-        {$tr('footer.connectButtonNotConnected')}
-      </StandardButton>
+      <div class="flex flex-row items-center gap-3">
+        <StandardButton onClick={connectButtonClicked}>
+          {$tr('footer.connectButtonNotConnected')}
+        </StandardButton>
+        <JacdacConnectButton compact={true} />
+        <JacdacToolsPopup />
+      </div>
     </div>
   {:else}
     <!-- Input microbit is assigned -->
@@ -76,10 +82,14 @@
           <LiveGraphInformationSection />
         </div>
         <div class="absolute right-4 top-2 m-0 float-right">
-          <ConnectedLiveGraphButtons
-            onInputDisconnectButtonClicked={inputDisconnectButtonClicked}
-            onOutputConnectButtonClicked={connectButtonClicked}
-            onOutputDisconnectButtonClicked={outputDisconnectButtonClicked} />
+          <div class="flex flex-row items-center gap-2">
+            <JacdacConnectButton compact={true} />
+            <JacdacToolsPopup />
+            <ConnectedLiveGraphButtons
+              onInputDisconnectButtonClicked={inputDisconnectButtonClicked}
+              onOutputConnectButtonClicked={connectButtonClicked}
+              onOutputDisconnectButtonClicked={outputDisconnectButtonClicked} />
+          </div>
         </div>
       </div>
 

@@ -35,7 +35,7 @@ export const startConnectionProcess = (): void => {
   connectionDialogState.update(s => {
     s.connectionState = get(stores.getDevices()).isInputConnected
       ? ConnectDialogStates.START_OUTPUT
-      : ConnectDialogStates.START;
+      : ConnectDialogStates.BLUETOOTH;
     s.deviceState = get(stores.getDevices()).isInputConnected
       ? DeviceRequestStates.OUTPUT
       : DeviceRequestStates.INPUT;
