@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { SRV_ILLUMINANCE, SRV_LED, SRV_LIGHT_LEVEL } from 'jacdac-ts';
+  import { SRV_ILLUMINANCE, SRV_LED, SRV_LIGHT_LEVEL, SRV_MAGNETIC_FIELD_LEVEL } from 'jacdac-ts';
   import type { JDService } from 'jacdac-ts';
   import BaseDialog from '../../components/ui/dialogs/BaseDialog.svelte';
   import { devices as jacdacDevices, connected } from './stores';
   import ButtonMonitor from './ButtonMonitor.svelte';
   import LedRing from './LedRing.svelte';
   import LightSensorLedAutomation from './LightSensorLedAutomation.svelte';
+  import MagnetSensorLedAutomation from './MagnetSensorLedAutomation.svelte';
 
   let isOpen = false;
 
@@ -19,6 +20,15 @@
       .filter(
         (service: JDService) =>
           service.serviceClass === SRV_LIGHT_LEVEL || service.serviceClass === SRV_ILLUMINANCE
+      )
+  );
+
+  $: magnetServices = $jacdacDevices.flatMap((device) =>
+    device
+      .services()
+      .filter(
+        (service: JDService) =>
+          service.serviceClass === SRV_MAGNETIC_FIELD_LEVEL
       )
   );
 </script>
@@ -68,6 +78,17 @@
           <p class="empty-message">Connect an LED ring service to use this automation.</p>
         {:else}
           <LightSensorLedAutomation {lightServices} {ledServices} />
+        {/if}
+      </section>
+
+      <section class="section">
+        <h3>Magnet sensor -> LED ring</h3>
+        {#if magnetServices.length === 0}
+          <p class="empty-message">No magnet sensor service detected on the Jacdac bus.</p>
+        {:else if ledServices.length === 0}
+          <p class="empty-message">Connect an LED ring service to use this automation.</p>
+        {:else}
+          <MagnetSensorLedAutomation {magnetServices} {ledServices} />
         {/if}
       </section>
     </div>
