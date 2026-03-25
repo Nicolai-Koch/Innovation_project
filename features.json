@@ -5,7 +5,7 @@
   "makecode": true,
   "liveGraphInputValues": true,
   "recordingScrubberValues": true,
-  "modelValidation": true,
+  "modelValidation": false,
   "modelSettings": true,
   "fingerprint": true,
   "recordingDuration": 1800,
