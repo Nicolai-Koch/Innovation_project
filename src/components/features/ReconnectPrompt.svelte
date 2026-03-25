@@ -42,7 +42,13 @@
       connectState === DeviceRequestStates.INPUT ? $btPatternInput : $btPatternOutput;
     const name = MBSpecs.Utility.patternToName(pairingPattern);
 
-    const connect = () => {
+    const connect = async () => {
+      // Unlink USB connection before attempting Bluetooth to prevent interface contention
+      try {
+        await Microbits.unlinkMicrobit();
+      } catch (error) {
+        console.warn('No USB connection to unlink', error);
+      }
       if (connectState == DeviceRequestStates.INPUT) {
         return Microbits.connectInput(name);
       }

@@ -14,6 +14,7 @@
   import { hasSomeRecordingData } from './data/DataPage';
   import DataPageNoData from './data/DataPageNoData.svelte';
   import DataPageWithData from './data/DataPageWithData.svelte';
+  import DataPageJacdacRecordTrigger from '../lib/jacdac/DataPageJacdacRecordTrigger.svelte';
 
   const gestures = stores.getGestures();
 
@@ -53,6 +54,8 @@
 
 <!-- Main pane -->
 <main class="min-w-full flex flex-col max-w-full min-h-full">
+  <DataPageJacdacRecordTrigger />
+
   <div>
     <DataPageControlBar
       clearDisabled={$gestures.length === 0}

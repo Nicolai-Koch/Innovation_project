@@ -58,6 +58,12 @@
     isConnecting = true;
     const connectionResult = async () => {
       Logger.log('BluetoothConnectDialog', 'Attempting to connect to micro:bit');
+      // Unlink USB connection before attempting Bluetooth to prevent interface contention
+      try {
+        await Microbits.unlinkMicrobit();
+      } catch (error) {
+        Logger.log('BluetoothConnectDialog', 'No USB connection to unlink', error);
+      }
       if (deviceState == DeviceRequestStates.INPUT) {
         await Microbits.connectInput(name);
       } else {
