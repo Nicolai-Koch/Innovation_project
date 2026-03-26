@@ -5,21 +5,15 @@
  -->
 
 <style>
-  .grid-container {
-    display: grid;
-    gap: 1rem 1rem;
-    grid-template-areas:
-      'a b'
-      'a c';
+  .hero-card {
+    background: rgba(255, 255, 255, 0.82);
+    border: 2px solid rgba(255, 255, 255, 0.95);
+    border-radius: 22px;
+    box-shadow: 0 14px 30px rgba(36, 41, 58, 0.1);
   }
 </style>
 
 <script lang="ts">
-  import { type ComponentType } from 'svelte';
-  import FrontPageContentTile from '../components/features/FrontPageContentTile.svelte';
-  import DoItYourselfMachineLearningTile from './home-page-content-tiles/DoItYourselfMachineLearningTile.svelte';
-  import NewFeaturesTile from './home-page-content-tiles/NewFeaturesTile.svelte';
-  import WhatIsMachineLearningTile from './home-page-content-tiles/WhatIsMachineLearningTile.svelte';
   import ControlBar from '../components/ui/control-bar/ControlBar.svelte';
   import ContactUsControlBarButton from '../components/ui/control-bar/control-bar-items/ContactUsControlBarButton.svelte';
   import SelectLanguageControlBarDropdown from '../components/ui/control-bar/control-bar-items/SelectLanguageControlBarDropdown.svelte';
@@ -27,14 +21,6 @@
   import Environment from '../lib/Environment';
   import DevTools from '../components/features/GoToPlaygroundButton.svelte';
   import { isLoading } from '../lib/stores/ApplicationState';
-
-  type ContentTile = { tile: ComponentType; spanColumns: number };
-  // Just add the content titles you wish to put on front page, in the order you wish them to be there
-  const contentTiles: ContentTile[] = [
-    { tile: DoItYourselfMachineLearningTile, spanColumns: 1 },
-    { tile: NewFeaturesTile, spanColumns: 1 },
-    { tile: WhatIsMachineLearningTile, spanColumns: 2 },
-  ];
 </script>
 
 <main class="h-full flex flex-col">
@@ -55,11 +41,15 @@
         </div>
       </ControlBar>
     </div>
-    <div class="p-10 pb-2 pt-2 mt-3">
-      <div class="grid-container grid-cols-2 min-w-800px">
-        {#each contentTiles as { tile, spanColumns }}
-          <FrontPageContentTile contentComponent={tile} fillColumns={spanColumns} />
-        {/each}
+    <div class="p-8 pt-4">
+      <div class="hero-card max-w-4xl mx-auto p-8">
+        <h1 class="text-4xl font-bold mb-6 text-center">{$t('content.index.heading')}</h1>
+
+        <div class="flex flex-col gap-3 text-xl">
+          <div class="bg-white bg-opacity-75 rounded-xl p-4 font-semibold text-center">
+            1. Optag data -> 2. Træn model -> 3. Se resultat
+          </div>
+        </div>
       </div>
     </div>
     <div class="flex-grow flex items-end">

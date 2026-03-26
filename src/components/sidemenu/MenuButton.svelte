@@ -25,16 +25,16 @@
 
 <div>
   <div
-    class="border bg-opacity-75 border-solid border-3
-           border-opacity-80 min-h-20
-		   text-secondarytext border-secondary
+    class="border bg-opacity-85 border-solid border-3
+           border-white min-h-20
+		   text-secondarytext
 		   select-none transition duration-300
 		   rounded-full bg-primary"
     class:bg-secondary={isExpanded}
-    class:bg-opacity-90={isExpanded}
+    class:text-primarytext={isExpanded}
+    class:bg-opacity-95={isExpanded}
     class:cursor-pointer={!isExpanded}
-    class:hover:bg-border-opacity-30={!isExpanded}
-    class:hover:bg-opacity-95={!isExpanded}
+    class:hover:bg-opacity-100={!isExpanded}
     class:rounded-3xl={isExpanded}
     on:click={onClickFunction}>
     <!-- Title -->

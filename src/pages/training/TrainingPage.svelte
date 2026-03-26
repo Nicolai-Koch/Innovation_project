@@ -10,14 +10,18 @@
   import TrainingPageModelView from './TrainingPageModelView.svelte';
   import InsufficientData from './InsufficientData.svelte';
   import TrainingPageTabs from './controlbar/TrainingPageTabs.svelte';
+  import { Feature, hasFeature } from '../../lib/FeatureToggles';
 
   const gestures = stores.getGestures();
   const sufficientData = gestures.hasSufficientData();
+  const showTrainingTabs = hasFeature(Feature.KNN_MODEL);
 </script>
 
 <TrainingFailedDialog />
 <div class="flex flex-col h-full">
-  <TrainingPageTabs />
+  {#if showTrainingTabs}
+    <TrainingPageTabs />
+  {/if}
   {#if !sufficientData}
     <InsufficientData />
   {:else}

@@ -19,6 +19,27 @@
       opacity: 0;
     }
   }
+
+  @keyframes floatBlob {
+    0% {
+      transform: translateY(0px) scale(1);
+    }
+    50% {
+      transform: translateY(-8px) scale(1.03);
+    }
+    100% {
+      transform: translateY(0px) scale(1);
+    }
+  }
+
+  .kid-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(1px);
+    opacity: 0.35;
+    animation: floatBlob 6s ease-in-out infinite;
+    pointer-events: none;
+  }
 </style>
 
 <script lang="ts">
@@ -89,7 +110,16 @@
 
       <div
         class="h-full w-full overflow-y-hidden overflow-x-auto
-    flex flex-col bg-backgrounddark shadow-2xl">
+    flex flex-col shadow-2xl"
+        style="background: linear-gradient(170deg, #fff9ed 0%, #edf8ff 48%, #f5edff 100%);">
+        <div class="kid-blob w-70 h-70 -top-6 -right-8" style="background:#ffd166;" />
+        <div
+          class="kid-blob w-56 h-56 top-35 -left-18"
+          style="background:#2ec4b6; animation-delay: 0.8s;" />
+        <div
+          class="kid-blob w-52 h-52 bottom-24 right-20"
+          style="background:#ff6b6b; animation-delay: 1.6s;" />
+
         <!-- CONTENT -->
         <div class="relative z-1 flex-1 overflow-y-auto flex-row">
           <PageContentView />

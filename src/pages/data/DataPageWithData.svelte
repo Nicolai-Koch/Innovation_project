@@ -11,9 +11,7 @@
   import Gesture from '../../components/features/datacollection/Gesture.svelte';
   import NewGestureButton from '../../components/features/NewGestureButton.svelte';
   import { stores } from '../../lib/stores/Stores';
-  import Information from '../../components/ui/information/Information.svelte';
   import StandardButton from '../../components/ui/buttons/StandardButton.svelte';
-  import RecordInformationContent from '../../components/features/datacollection/RecordInformationContent.svelte';
   import ConnectDialogContainer from '../../components/features/connection-prompt/ConnectDialogContainer.svelte';
 
   let isConnectionDialogOpen = false;
@@ -38,29 +36,8 @@
 </StandardDialog>
 <ConnectDialogContainer />
 
-<div class="relative flex h-7">
-  <div class="absolute left-3 flex">
-    <Information
-      isLightTheme={false}
-      iconText={$t('content.data.classification')}
-      titleText={$t('content.data.classHelpHeader')}
-      bodyText={$t('content.data.classHelpBody')} />
-  </div>
-  <div class="absolute left-55 flex">
-    <Information isLightTheme={false} iconText={$t('content.data.choice')}>
-      <RecordInformationContent isLightTheme={false} />
-    </Information>
-  </div>
-  <div class="absolute left-92 flex">
-    <Information
-      isLightTheme={false}
-      iconText={$t('content.data.data')}
-      titleText={$t('content.data.data')}
-      bodyText={$t('content.data.dataDescription')} />
-  </div>
-</div>
 <!-- Display all gestures -->
-<div class="flex flex-col gap-2 pt-8">
+<div class="flex flex-col gap-2 pt-3">
   {#each $gestures as gesture (gesture.ID)}
     <Gesture
       gesture={gestures.getGesture(gesture.ID)}

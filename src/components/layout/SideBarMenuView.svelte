@@ -32,7 +32,7 @@
 </script>
 
 <div
-  class="bg-gradient-to-b from-primary to-secondary relative flex flex-col w-full shadow-2xl">
+  class="bg-gradient-to-b from-primary via-secondary to-primaryaccent relative flex flex-col w-full shadow-2xl">
   <!-- flush top bar -->
   <div class="h-12 shadow-md w-full flex justify-center">
     <MediaQuery query="(max-width: 1500px)" let:matches={isSmall}>
