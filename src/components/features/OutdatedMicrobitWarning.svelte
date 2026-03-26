@@ -46,7 +46,7 @@
   };
 
   const openConnectionPrompt = () => {
-    $connectionDialogState.connectionState = ConnectDialogStates.USB_START;
+    $connectionDialogState.connectionState = ConnectDialogStates.BLUETOOTH;
     $connectionDialogState.deviceState =
       targetRole === 'INPUT' ? DeviceRequestStates.INPUT : DeviceRequestStates.OUTPUT;
   };

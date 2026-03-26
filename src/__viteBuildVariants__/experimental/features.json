@@ -9,6 +9,6 @@
   "modelSettings": false,
   "fingerprint": true,
   "recordingDuration": 2500,
-  "printableRecordings": true,
-  "dialogRecordings": true
+  "printableRecordings": false,
+  "dialogRecordings": false
 }

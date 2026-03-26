@@ -6,16 +6,15 @@
 
 <script lang="ts">
   import { fade } from 'svelte/transition';
+  import { t } from '../../../i18n';
   import type { GestureID } from '../../../lib/domain/stores/gesture/Gesture';
   import { stores } from '../../../lib/stores/Stores';
   import GestureDot from './../GestureDot.svelte';
   import RecordingGraph from '../../features/graphs/recording/RecordingGraph.svelte';
   import type { RecordingData } from '../../../lib/domain/RecordingData';
   import Tooltip from './../Tooltip.svelte';
-  import { serializeRecordingToCsvWithoutGestureName } from '../../../lib/utils/CSVUtils';
   import RecordingFingerprint from './RecordingFingerprint.svelte';
   import { Feature, hasFeature } from '../../../lib/FeatureToggles';
-  import { tr } from '../../../i18n';
   import RecordingDialog from './RecordingDialog.svelte';
 
   // get recording from mother prop
@@ -23,7 +22,6 @@
   export let gestureId: GestureID;
   export let onDelete: (recording: RecordingData) => void;
   export let dot: { gesture: GestureID; color: string } | undefined = undefined;
-  export let downloadable: boolean = false;
   export let enableFingerprint: boolean;
 
   $: dotGesture = dot?.gesture
@@ -62,20 +60,6 @@
     // close and propagate delete
     showDialog = false;
     deleteClicked();
-  }
-
-  function bottomRightButtonClicked() {
-    const csvContent = serializeRecordingToCsvWithoutGestureName(recording);
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${gesture.getName()}_recording_${recording.ID}.csv`;
-    link.click();
-
-    // Clean up the URL object
-    URL.revokeObjectURL(url);
   }
 
   $: shouldDisplayFingerprint = enableFingerprint && hasFeature(Feature.FINGERPRINT);
@@ -117,7 +101,7 @@
       {/if}
     </div>
   {/if}
-  <Tooltip title={$tr('content.data.tooltip.remove')} offset={{ x: -26, y: -50 }}>
+  <Tooltip title={$t('content.data.tooltip.remove')} offset={{ x: -26, y: -50 }}>
     <button class="absolute -left-2.8px top-0px outline-none">
       <div class="relative">
         <i class="z-1 absolute fas fa-circle fa-lg text-white" />
@@ -129,22 +113,10 @@
     </button>
   </Tooltip>
 
-  <!-- Download Button -->
-  {#if downloadable}
-    <Tooltip title="CSV" offset={{ x: 12, y: -50 }}>
-      <button
-        class="absolute top-0px left-6 text-light-800 hover:text-black transition ease"
-        on:click|stopPropagation={bottomRightButtonClicked}>
-        <i class="fas fa-download z-1 absolute fa-md" />
-      </button>
-    </Tooltip>
-  {/if}
-
   {#if showDialog}
     <RecordingDialog
       {recording}
       gestureName={$gesture.name}
-      {downloadable}
       {enableFingerprint}
       on:close={closeDialog}
       on:delete={dialogDelete} />

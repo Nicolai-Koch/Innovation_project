@@ -46,7 +46,8 @@
 
 <div
   bind:clientWidth={componentWidth}
-  class="h-full w-full bg-white border-t border-solid border-black border-opacity-60 shadow-black shadow-xl"
+  class="w-full bg-white border-t border-solid border-black border-opacity-60 shadow-black shadow-xl"
+  style:height={$devices.isInputAssigned ? '160px' : '88px'}
   class:bg-gray-300={$devices.isInputAssigned && !$devices.isInputReady}>
   <ConnectDialogContainer bind:this={connectDialogReference} />
 

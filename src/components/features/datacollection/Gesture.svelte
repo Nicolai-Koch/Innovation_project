@@ -25,8 +25,7 @@
   import { startRecording } from '../../../lib/utils/Recording';
   import GestureDot from '../../ui/GestureDot.svelte';
   import StandardButton from '../../ui/buttons/StandardButton.svelte';
-  import { Feature, getFeature, hasFeature } from '../../../lib/FeatureToggles';
-  import { printRecordings } from '../../../lib/utils/printRecordings';
+  import { Feature, getFeature } from '../../../lib/FeatureToggles';
 
   export let onNoMicrobitSelect: () => void;
   export let gesture: Gesture;
@@ -46,12 +45,6 @@
     if (gesture.getName() === defaultNewName) {
       gesture.setName('');
     }
-  }
-
-  function handlePrintRecordings(): void {
-    const recordings = gesture.getRecordings() ?? [];
-    if (!recordings || recordings.length === 0) return;
-    printRecordings(gesture.getName(), recordings);
   }
 
   function removeClicked(): void {
@@ -177,12 +170,6 @@
     <GestureCard mr small>
       <div class="top-2 left-3 absolute flex flex-row justify-center items-center gap-4">
         <GestureDot {gesture} />
-
-        {#if hasFeature(Feature.PRINTABLE_RECORDINGS)}
-          <StandardButton small onClick={() => handlePrintRecordings()}>
-            Print
-          </StandardButton>
-        {/if}
       </div>
       <div class="grid grid-cols-5 place-items-center p-2 w-50 h-30">
         <div
@@ -235,7 +222,6 @@
           {#each $gesture.recordings as recording (String($gesture.ID) + String(recording.ID))}
             <Recording
               enableFingerprint={$enableFingerprint}
-              downloadable
               {recording}
               gestureId={$gesture.ID}
               onDelete={deleteRecording} />

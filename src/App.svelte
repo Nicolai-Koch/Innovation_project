@@ -126,7 +126,7 @@
         </div>
 
         <!-- BOTTOM BAR -->
-        <div class="h-160px w-full">
+        <div class="w-full">
           <BottomBarMenuView />
         </div>
       </div>

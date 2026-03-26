@@ -13,14 +13,12 @@
   import { createEventDispatcher } from 'svelte';
   import RecordingGraph from '../../features/graphs/recording/RecordingGraph.svelte';
   import RecordingFingerprint from './RecordingFingerprint.svelte';
-  import { serializeRecordingToCsvWithoutGestureName } from '../../../lib/utils/CSVUtils';
   import type { RecordingData } from '../../../lib/domain/RecordingData';
   import { Feature, hasFeature } from '../../../lib/FeatureToggles';
   import { tr } from '../../../i18n';
 
   export let recording: RecordingData;
   export let gestureName: string = '';
-  export let downloadable: boolean = false;
   export let enableFingerprint: boolean = false;
 
   const dispatch = createEventDispatcher();
@@ -31,19 +29,6 @@
 
   function confirmDelete() {
     dispatch('delete');
-  }
-
-  function downloadCsv() {
-    const csvContent = serializeRecordingToCsvWithoutGestureName(recording);
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${gestureName}_recording_${recording.ID}.csv`;
-    link.click();
-
-    URL.revokeObjectURL(url);
   }
 
   $: shouldDisplayFingerprint = enableFingerprint && hasFeature(Feature.FINGERPRINT);
@@ -87,14 +72,6 @@
     <div class="flex justify-between items-start mb-2">
       <h3 class="text-lg font-semibold">{gestureName}</h3>
       <div class="flex items-center space-x-2">
-        {#if downloadable}
-          <button
-            class="px-2 py-1 text-sm text-light-800 hover:text-black"
-            on:click={downloadCsv}>
-            <i class="fas fa-download mr-1" />{$tr('content.data.dialog.download') ||
-              'Download CSV'}
-          </button>
-        {/if}
         <button
           class="px-2 py-1 text-sm text-red-600 hover:text-red-800"
           on:click={confirmDelete}>

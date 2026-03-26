@@ -5,31 +5,16 @@
  -->
 
 <script lang="ts">
-  import { t } from '../../../i18n';
   import StandardButton from '../../ui/buttons/StandardButton.svelte';
 
-  export let onStartUsbClick: () => void;
+  import { t } from '../../../i18n';
   export let onStartBluetoothClick: () => void;
 </script>
 
 <main>
-  <div class="grid grid-cols-2 w-600px text-center">
+  <div class="grid grid-cols-1 w-320px text-center">
     <div
-      class="hover:cursor-pointer mr-2 border-gray-200
-             border border-solid rounded-lg p-6 shadow-lg"
-      on:click={onStartUsbClick}>
-      <h1 class="font-bold">
-        {$t('connectMB.main.usbHeader')}
-      </h1>
-      <p class="mb-5">
-        {$t('connectMB.main.usbBody')}
-      </p>
-      <StandardButton icon="/imgs/usb.svg">
-        {$t('connectMB.main.installButton')}
-      </StandardButton>
-    </div>
-    <div
-      class="hover:cursor-pointer ml-2 border-gray-200 border border-solid rounded-lg p-6 shadow-lg"
+      class="hover:cursor-pointer border-gray-200 border border-solid rounded-lg p-6 shadow-lg"
       on:click={onStartBluetoothClick}>
       <h1 class="font-bold">
         {$t('connectMB.main.btHeader')}

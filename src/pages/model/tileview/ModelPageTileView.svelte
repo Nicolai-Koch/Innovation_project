@@ -10,7 +10,6 @@
   import { onMount } from 'svelte';
   import Microbits from '../../../lib/microbit-interfacing/Microbits';
   import ModelPageTileViewTiles from './ModelPageTileViewTiles.svelte';
-  import StaticConfiguration from '../../../StaticConfiguration';
   import { stores } from '../../../lib/stores/Stores';
   import { Feature, getFeature } from '../../../lib/FeatureToggles';
 
@@ -87,20 +86,6 @@
     <TrainModelFirstTitle />
   {:else}
     <ModelPageTileViewTiles />
-    <div
-      class="flex flex-row mt-12 mx-30 bg-backgroundlight border-secondary border-1 p-4 rounded justify-center shadow-xl">
-      <div class="flex flex-col">
-        <p class="text-md font-bold text-primary text-center">MakeCode</p>
-        <p class="text-sm">
-          You can create a hex file on <a
-            target="_blank"
-            href={StaticConfiguration.makecodeFirmwareUrl}
-            class="text-secondary">
-            MakeCode
-          </a>
-        </p>
-      </div>
-    </div>
   {/if}
 </main>
 

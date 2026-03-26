@@ -13,13 +13,47 @@
   const bestPrediction = gestures.getBestPrediction();
   const devices = stores.getDevices();
 
-  $: confidence =
-    $devices.isInputReady && $bestPrediction
-      ? $bestPrediction.getConfidence().getCurrentConfidence()
-      : 0;
+  let displayedGestureId: number | undefined = undefined;
+  let displayedGestureName = '';
+  let displayedConfidence = 0;
+
+  // Keep last accepted prediction: only values above threshold can update the UI.
+  $: {
+    if ($devices.isInputReady && $bestPrediction) {
+      const candidateId = $bestPrediction.getId();
+      const candidateName = $bestPrediction.getName();
+      const candidateConfidence = $bestPrediction.getConfidence().getCurrentConfidence();
+      const requiredConfidence = $bestPrediction.getConfidence().getRequiredConfidence();
+      const isAboveThreshold = candidateConfidence > requiredConfidence;
+
+      if (isAboveThreshold) {
+        if (displayedGestureId !== candidateId) {
+          displayedGestureId = candidateId;
+          displayedGestureName = candidateName;
+          displayedConfidence = candidateConfidence;
+        } else if (candidateConfidence > displayedConfidence) {
+          displayedGestureName = candidateName;
+          displayedConfidence = candidateConfidence;
+        } else {
+          displayedGestureName = candidateName;
+        }
+      }
+    }
+  }
+
+  const model = stores.getClassifier().getModel();
+
+  $: if (!$model.hasModel) {
+    displayedGestureId = undefined;
+    displayedGestureName = '';
+    displayedConfidence = 0;
+  }
+
+  $: confidence = $devices.isInputReady ? displayedConfidence : 0;
   confidence = isNaN(confidence) ? 0 : confidence;
 
   const getPredictionLabel = (
+    hasAcceptedPrediction: boolean,
     isInputReady: boolean,
     bestPrediction: Gesture | undefined,
   ) => {
@@ -29,13 +63,18 @@
     if (!isInputReady) {
       return $t('menu.model.connectInputMicrobit');
     }
-    return bestPrediction.getName();
+    if (!hasAcceptedPrediction) {
+      return '-';
+    }
+    return displayedGestureName;
   };
 
-  const model = stores.getClassifier().getModel();
-
   $: confidenceLabel = Math.round(confidence * 100).toString() + '%';
-  $: predictionLabel = getPredictionLabel($devices.isInputReady, $bestPrediction);
+  $: predictionLabel = getPredictionLabel(
+    displayedGestureId !== undefined,
+    $devices.isInputReady,
+    $bestPrediction,
+  );
 </script>
 
 <div class="w-full text-center justify-center pt-5">
