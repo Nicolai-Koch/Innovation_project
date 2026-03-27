@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { connected, error, initializeBus, connectToBus, disconnectFromBus } from './stores';
+  import StandardButton from '../../components/ui/buttons/StandardButton.svelte';
 
   export let compact = false;
 
@@ -44,14 +45,17 @@
 </script>
 
 <div class="connect-button-container">
-  <button
-    on:click={handleClick}
-    disabled={isConnecting}
-    class="connect-button"
-    class:connected={$connected}
-  >
-    {isConnecting ? 'Connecting...' : $connected ? 'Jacdac connected' : 'Connect Jacdac'}
-  </button>
+  {#key $connected}
+    <StandardButton
+      small={compact}
+      medium={!compact}
+      color={$connected ? 'warning' : 'secondary'}
+      outlined={true}
+      onClick={handleClick}
+    >
+      {$connected ? 'Frakobl Jacdac' : 'Connect Jacdac'}
+    </StandardButton>
+  {/key}
 
   {#if errorMessage && !compact}
     <div class="error-message">
@@ -78,36 +82,6 @@
     flex-direction: column;
     gap: 0.5rem;
     margin: 0;
-  }
-
-  .connect-button {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.9rem;
-    border: 2px solid #ccc;
-    border-radius: 4px;
-    background: white;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .connect-button:hover:not(:disabled) {
-    background: #f0f0f0;
-    border-color: #999;
-  }
-
-  .connect-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .connect-button.connected {
-    background: #4caf50;
-    color: white;
-    border-color: #2e7d32;
-  }
-
-  .connect-button.connected:hover {
-    background: #45a049;
   }
 
   .status-message {

@@ -9,6 +9,8 @@
   import MagnetSensorLedAutomation from './MagnetSensorLedAutomation.svelte';
 
   let isOpen = false;
+  export let iconOnly = false;
+  export let subtle = false;
 
   $: ledServices = $jacdacDevices.flatMap((device) =>
     device.services().filter((service: JDService) => service.serviceClass === SRV_LED)
@@ -33,8 +35,18 @@
   );
 </script>
 
-<button class="tools-button" on:click={() => (isOpen = true)}>
-  Jacdac tools
+<button
+  class="tools-button"
+  class:icon-only={iconOnly}
+  class:subtle={subtle}
+  on:click={() => (isOpen = true)}
+  aria-label="Open Jacdac tools"
+  title="Jacdac tools">
+  {#if iconOnly}
+    <i class="fas fa-cog" />
+  {:else}
+    Jacdac tools
+  {/if}
 </button>
 
 <BaseDialog isOpen={isOpen} onClose={() => (isOpen = false)}>
@@ -108,6 +120,29 @@
 
   .tools-button:hover {
     background: #1976d2;
+  }
+
+  .tools-button.icon-only {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tools-button.subtle {
+    background: rgba(255, 255, 255, 0.28);
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(2px);
+  }
+
+  .tools-button.subtle:hover {
+    background: rgba(255, 255, 255, 0.45);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.9);
   }
 
   .tools-dialog {

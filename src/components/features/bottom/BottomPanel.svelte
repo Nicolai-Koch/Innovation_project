@@ -17,14 +17,10 @@
   import MicrobitLiveGraph from '../graphs/MicrobitLiveGraph.svelte';
   import StandardButton from '../../ui/buttons/StandardButton.svelte';
   import { stores } from '../../../lib/stores/Stores';
-  import LiveDataFingerprint from './LiveDataFingerprint.svelte';
-  import { Feature, hasFeature } from '../../../lib/FeatureToggles';
-  import Switch from '../../ui/Switch.svelte';
   import JacdacConnectButton from '../../../lib/jacdac/ConnectButton.svelte';
-  import JacdacToolsPopup from '../../../lib/jacdac/JacdacToolsPopup.svelte';
+  import { currentPath, Paths } from '../../../router/Router';
 
   const devices = stores.getDevices();
-  const enableFingerprint = stores.getEnableFingerprint();
 
   let componentWidth: number;
   let connectDialogReference: ConnectDialogContainer;
@@ -59,7 +55,6 @@
           {$tr('footer.connectButtonNotConnected')}
         </StandardButton>
         <JacdacConnectButton compact={true} />
-        <JacdacToolsPopup />
       </div>
     </div>
   {:else}
@@ -82,11 +77,11 @@
         <div class="float-left mt-2 ml-2">
           <LiveGraphInformationSection />
         </div>
-        <div class="absolute right-4 top-2 m-0 float-right">
+        <div class="absolute right-4 bottom-2 m-0 float-right z-10">
           <div class="flex flex-row items-center gap-2">
             <JacdacConnectButton compact={true} />
-            <JacdacToolsPopup />
             <ConnectedLiveGraphButtons
+              showOutputControls={$currentPath === Paths.MODEL}
               onInputDisconnectButtonClicked={inputDisconnectButtonClicked}
               onOutputConnectButtonClicked={connectButtonClicked}
               onOutputDisconnectButtonClicked={outputDisconnectButtonClicked} />
@@ -96,24 +91,8 @@
 
       <!-- Right part of live-graph -->
       <div class="absolute right-0 bottom-0 h-full w-45 flex flex-col justify-between">
-        {#if hasFeature(Feature.FINGERPRINT)}
-          <div class="pt-2 pr-2 justify-end flex flex-row gap-2">
-            <p>Fingerprint:</p>
-            <Switch
-              size="sm"
-              bind:checked={$enableFingerprint}
-              on:change={e => enableFingerprint.set(e.detail.checked)} />
-          </div>
-          {#if $enableFingerprint}
-            <div class="absolute h-full">
-              <LiveDataFingerprint gestureName="Live" />
-            </div>
-          {/if}
-        {/if}
-
         <div
           class="flex flex-row pl-4 justify-center cursor-pointer hover:bg-secondary hover:bg-opacity-10 transition"
-          class:pl-4={$enableFingerprint}
           on:click={() => (isLive3DOpen = true)}>
           <View3DLive width={140} height={140} freeze={isLive3DOpen} />
         </div>

@@ -29,7 +29,6 @@
   // IMPORT AND DEFAULTS
   import OutputMatrix from './ModelMatrix.svelte';
   import OutputSoundSelector from './ModelSoundSelector.svelte';
-  import PinSelector from './ModelPinSelector.svelte';
   import { PinTurnOnState } from '../../../lib/PinTurnOnState';
   import { MBSpecs } from 'microbyte';
 
@@ -288,13 +287,5 @@
       </div>
     </div>
     <OutputSoundSelector onSoundSelection={onSoundSelected} {selectedSound} />
-  </div>
-  <div class="ml-4">
-    <PinSelector
-      selectedPin={pinIOEnabled ? selectedPin : undefined}
-      {turnOnState}
-      {turnOnTime}
-      {onPinSelect}
-      {onTurnOnTimeSelect} />
   </div>
 </main>

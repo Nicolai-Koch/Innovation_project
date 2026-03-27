@@ -15,18 +15,18 @@
 </script>
 
 <!-- Main pane -->
-<main class="min-w-full flex flex-col max-w-full min-h-full">
+<main class="min-w-full max-w-full h-full min-h-0 flex flex-col">
   <DataPageJacdacRecordTrigger />
 
-  <div class="shadow-md w-full flex items-center px-4 py-2">
-    <div class="w-full flex flex-wrap items-center gap-x-8 gap-y-2 text-black font-semibold">
+  <div class="shadow-md w-full h-12 flex items-center px-4">
+    <div class="w-full flex flex-wrap items-center gap-x-20 gap-y-2 text-black font-semibold">
       <div class="text-sm sm:text-base">1. Tilføj en aktion</div>
-      <div class="text-sm sm:text-base">2. Optag 3-5 gange pr. aktion</div>
+      <div class="text-sm sm:text-base">2. Optag aktion</div>
       <div class="text-sm sm:text-base">3. Træn model</div>
     </div>
   </div>
 
-  <div class="overflow-x-auto p-3 flex-grow flex">
+  <div class="overflow-auto p-3 flex-1 min-h-0 flex">
     {#if !$hasSomeRecordingData && !$gestures.length}
       <DataPageNoData />
     {:else}

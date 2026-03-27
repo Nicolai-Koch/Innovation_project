@@ -14,6 +14,7 @@
   const confidences = stores.getConfidences();
 
   const model = stores.getClassifier().getModel();
+  let frozenSuccessByChallenge: Record<number, number> = {};
 
   $: activeGesture =
     $activeChallengeNumber !== null && $activeChallengeNumber > 0
@@ -26,9 +27,33 @@
     $devices.isInputReady && activeGestureId !== undefined && $confidences.has(activeGestureId)
       ? ($confidences.get(activeGestureId) ?? 0)
       : 0;
-  confidence = isNaN(confidence) ? 0 : confidence;
+  $: safeConfidence = isNaN(confidence) ? 0 : confidence;
 
-  $: confidenceLabel = Math.round(confidence * 100).toString() + '%';
+  $: activeChallengeKey = $activeChallenge?.challengeNumber;
+
+  $: {
+    if (
+      activeChallengeKey !== undefined &&
+      activeGesture &&
+      $devices.isInputReady &&
+      safeConfidence > activeGesture.confidence.requiredConfidence
+    ) {
+      const prev = frozenSuccessByChallenge[activeChallengeKey] ?? 0;
+      if (safeConfidence > prev) {
+        frozenSuccessByChallenge = {
+          ...frozenSuccessByChallenge,
+          [activeChallengeKey]: safeConfidence,
+        };
+      }
+    }
+  }
+
+  $: frozenSuccessConfidence =
+    activeChallengeKey !== undefined ? frozenSuccessByChallenge[activeChallengeKey] : undefined;
+
+  $: displayedConfidence = frozenSuccessConfidence ?? safeConfidence;
+
+  $: confidenceLabel = Math.round(displayedConfidence * 100).toString() + '%';
   $: predictionLabel = (() => {
     if (!$gestures.length) {
       return $t('menu.model.noModel');
@@ -67,7 +92,14 @@
       };
     }
 
-    if (confidence > activeGesture.confidence.requiredConfidence) {
+    if (frozenSuccessConfidence !== undefined) {
+      return {
+        text: `Udfordring #${$activeChallenge.challengeNumber}: Rigtigt (låst)` ,
+        isSuccess: true,
+      };
+    }
+
+    if (safeConfidence > activeGesture.confidence.requiredConfidence) {
       return {
         text: `Udfordring #${$activeChallenge.challengeNumber}: Rigtigt!`,
         isSuccess: true,

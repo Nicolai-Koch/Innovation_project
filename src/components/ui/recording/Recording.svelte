@@ -102,13 +102,15 @@
     </div>
   {/if}
   <Tooltip title={$t('content.data.tooltip.remove')} offset={{ x: -26, y: -50 }}>
-    <button class="absolute -left-2.8px top-0px outline-none">
-      <div class="relative">
+    <button
+      class="absolute -left-1 top-0 z-20 outline-none w-6 h-6 flex items-center justify-center"
+      on:click|stopPropagation={deleteClicked}
+      aria-label={$t('content.data.tooltip.remove')}>
+      <div class="relative w-5 h-5">
         <i class="z-1 absolute fas fa-circle fa-lg text-white" />
         <i
           class="z-2 absolute far fa-times-circle fa-lg transition
-									ease cursor-pointer text-light-800 hover:text-black"
-          on:click|stopPropagation={deleteClicked} />
+									ease text-light-800 hover:text-black" />
       </div>
     </button>
   </Tooltip>

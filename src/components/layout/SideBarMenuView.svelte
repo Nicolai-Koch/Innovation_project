@@ -14,6 +14,7 @@
   import Menus from '../sidemenu/Menus';
   import MenuButton from '../sidemenu/MenuButton.svelte';
   import { isLoading } from '../../lib/stores/ApplicationState';
+  import JacdacToolsPopup from '../../lib/jacdac/JacdacToolsPopup.svelte';
 
   $: shouldBeExpanded = (menuProps: MenuProperties) => {
     let path = $currentPath;
@@ -88,5 +89,9 @@
         {/if}
       {/each}
     </div>
+  </div>
+
+  <div class="absolute left-2 bottom-2 z-20 opacity-55 hover:opacity-100 transition-opacity duration-150">
+    <JacdacToolsPopup iconOnly={true} subtle={true} />
   </div>
 </div>

@@ -45,13 +45,6 @@
         titleText={$t('content.model.output.sound.descriptionTitle')}
         bodyText={$t('content.model.output.sound.descriptionBody')} />
     </div>
-    <div class="absolute left-167 flex">
-      <Information
-        isLightTheme={false}
-        iconText={$t('content.model.output.pin.iconTitle')}
-        titleText={$t('content.model.output.pin.descriptionTitle')}
-        bodyText={$t('content.model.output.pin.descriptionBody')} />
-    </div>
   </div>
 
   <div class="pl-1">

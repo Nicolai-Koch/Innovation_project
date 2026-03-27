@@ -14,13 +14,14 @@
   export let onOutputDisconnectButtonClicked: () => void;
   export let onOutputConnectButtonClicked: () => void;
   export let onInputDisconnectButtonClicked: () => void;
+  export let showOutputControls = true;
 
   const model = stores.getClassifier().getModel();
 </script>
 
 <!-- These are the buttons that are present while the input micro:bit is connected-->
 <div class="flex flex-row mr-4">
-  {#if $model.hasModel || $model.isTraining || $devices.isOutputConnected}
+  {#if showOutputControls && ($model.hasModel || $model.isTraining || $devices.isOutputConnected)}
     {#if $devices.isOutputAssigned}
       <!-- Output is assigned -->
       {#if !$devices.isOutputConnected || $devices.isOutputReady}
