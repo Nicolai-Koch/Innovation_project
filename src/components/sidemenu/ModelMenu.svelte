@@ -6,75 +6,79 @@
 
 <script lang="ts">
   import { t } from '../../i18n';
-  import Gesture from '../../lib/domain/stores/gesture/Gesture';
+  import { activeChallenge, activeChallengeNumber } from '../../lib/stores/BoardGameChallengeStore';
   import { stores } from '../../lib/stores/Stores';
 
   const gestures = stores.getGestures();
-  const bestPrediction = gestures.getBestPrediction();
   const devices = stores.getDevices();
-
-  let displayedGestureId: number | undefined = undefined;
-  let displayedGestureName = '';
-  let displayedConfidence = 0;
-
-  // Keep last accepted prediction: only values above threshold can update the UI.
-  $: {
-    if ($devices.isInputReady && $bestPrediction) {
-      const candidateId = $bestPrediction.getId();
-      const candidateName = $bestPrediction.getName();
-      const candidateConfidence = $bestPrediction.getConfidence().getCurrentConfidence();
-      const requiredConfidence = $bestPrediction.getConfidence().getRequiredConfidence();
-      const isAboveThreshold = candidateConfidence > requiredConfidence;
-
-      if (isAboveThreshold) {
-        if (displayedGestureId !== candidateId) {
-          displayedGestureId = candidateId;
-          displayedGestureName = candidateName;
-          displayedConfidence = candidateConfidence;
-        } else if (candidateConfidence > displayedConfidence) {
-          displayedGestureName = candidateName;
-          displayedConfidence = candidateConfidence;
-        } else {
-          displayedGestureName = candidateName;
-        }
-      }
-    }
-  }
+  const confidences = stores.getConfidences();
 
   const model = stores.getClassifier().getModel();
 
-  $: if (!$model.hasModel) {
-    displayedGestureId = undefined;
-    displayedGestureName = '';
-    displayedConfidence = 0;
-  }
+  $: activeGesture =
+    $activeChallengeNumber !== null && $activeChallengeNumber > 0
+      ? $gestures[$activeChallengeNumber - 1]
+      : undefined;
 
-  $: confidence = $devices.isInputReady ? displayedConfidence : 0;
+  $: activeGestureId = activeGesture ? activeGesture.ID : undefined;
+
+  $: confidence =
+    $devices.isInputReady && activeGestureId !== undefined && $confidences.has(activeGestureId)
+      ? ($confidences.get(activeGestureId) ?? 0)
+      : 0;
   confidence = isNaN(confidence) ? 0 : confidence;
 
-  const getPredictionLabel = (
-    hasAcceptedPrediction: boolean,
-    isInputReady: boolean,
-    bestPrediction: Gesture | undefined,
-  ) => {
-    if (!bestPrediction) {
+  $: confidenceLabel = Math.round(confidence * 100).toString() + '%';
+  $: predictionLabel = (() => {
+    if (!$gestures.length) {
       return $t('menu.model.noModel');
     }
-    if (!isInputReady) {
+    if (!$devices.isInputReady) {
       return $t('menu.model.connectInputMicrobit');
     }
-    if (!hasAcceptedPrediction) {
-      return '-';
+    if (!$activeChallenge) {
+      return 'Vælg udfordring';
     }
-    return displayedGestureName;
-  };
+    if (!activeGesture) {
+      return `Udfordring #${$activeChallenge.challengeNumber} findes ikke`;
+    }
+    return activeGesture.name;
+  })();
 
-  $: confidenceLabel = Math.round(confidence * 100).toString() + '%';
-  $: predictionLabel = getPredictionLabel(
-    displayedGestureId !== undefined,
-    $devices.isInputReady,
-    $bestPrediction,
-  );
+  $: challengeStatus = (() => {
+    if (!$activeChallenge) {
+      return {
+        text: 'Vælg en aktiv udfordring på Model-siden',
+        isSuccess: false,
+      };
+    }
+
+    if (!activeGesture) {
+      return {
+        text: `Udfordring #${$activeChallenge.challengeNumber}: ingen klasse med dette nummer`,
+        isSuccess: false,
+      };
+    }
+
+    if (!$devices.isInputReady) {
+      return {
+        text: 'Tilkobl micro:bit for at starte udfordringen',
+        isSuccess: false,
+      };
+    }
+
+    if (confidence > activeGesture.confidence.requiredConfidence) {
+      return {
+        text: `Udfordring #${$activeChallenge.challengeNumber}: Rigtigt!`,
+        isSuccess: true,
+      };
+    }
+
+    return {
+      text: `Udfordring #${$activeChallenge.challengeNumber}: Forkert bevægelse, prøv igen`,
+      isSuccess: false,
+    };
+  })();
 </script>
 
 <div class="w-full text-center justify-center pt-5">
@@ -99,6 +103,12 @@
     </div>
     <p class="text-4xl ml-5 mt-4 pb-4">
       {confidenceLabel}
+    </p>
+    <p
+      class="text-sm px-4 pb-2 font-semibold"
+      class:text-green-700={challengeStatus.isSuccess}
+      class:text-red-700={!challengeStatus.isSuccess}>
+      {challengeStatus.text}
     </p>
   {/if}
 </div>

@@ -38,8 +38,9 @@
 
 <!-- Display all gestures -->
 <div class="flex flex-col gap-2 pt-3">
-  {#each $gestures as gesture (gesture.ID)}
+  {#each $gestures as gesture, index (gesture.ID)}
     <Gesture
+      challengeNumber={index + 1}
       gesture={gestures.getGesture(gesture.ID)}
       onNoMicrobitSelect={() => (isConnectionDialogOpen = true)} />
   {/each}

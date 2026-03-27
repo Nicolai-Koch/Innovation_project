@@ -29,6 +29,7 @@
 
   export let onNoMicrobitSelect: () => void;
   export let gesture: Gesture;
+  export let challengeNumber: number | undefined = undefined;
   const devices = stores.getDevices();
   const gestures = stores.getGestures();
 
@@ -169,21 +170,26 @@
     <!-- Title of gesture-->
     <GestureCard mr small>
       <div class="top-2 left-3 absolute flex flex-row justify-center items-center gap-4">
-        <GestureDot {gesture} />
+        <GestureDot {gesture} disableTooltip={true}/>
       </div>
-      <div class="grid grid-cols-5 place-items-center p-2 w-50 h-30">
+      <div class="flex items-center justify-center relative p-2 w-50 h-30">
+        {#if challengeNumber !== undefined}
+          <div class="absolute top-3 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-bold z-10 pointer-events-none">
+            #{challengeNumber}
+          </div>
+        {/if}
         <div
-          class="w-40 col-start-2 col-end-5 text-center
+          class="w-40 text-center
 									font-semibold transition ease
 									rounded-xl border border-gray-300
-									border-solid hover:bg-gray-100">
+									border-solid hover:bg-gray-100 relative">
           <h3
             contenteditable
             bind:innerText={$nameBind}
             on:click={titleClicked}
             on:keypress={onTitleKeypress} />
         </div>
-        <button class="pl-3 col-start-5 place-self-start justify-self-end outline-none">
+        <button class="absolute right-2 top-2 outline-none">
           <i
             class="far fa-times-circle fa-lg text-light-800 hover:text-black transition ease"
             on:click={removeClicked} />
