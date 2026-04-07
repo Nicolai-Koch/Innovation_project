@@ -81,7 +81,7 @@
 <MediaQuery query="(max-width: 1000px)" let:matches>
   {#if matches}
     <div class="grid grid-cols-3 gap-4">
-      {#each stores.getGestures().getGestures() as gesture}
+      {#each stores.getGestures().getGestures() as gesture (gesture.getId())}
         <OutputGesture {gesture} {onUserInteraction} variant={'tile'} />
       {/each}
     </div>
@@ -90,7 +90,7 @@
 <MediaQuery query="(min-width: 1000px) and (max-width: 1367px)" let:matches>
   {#if matches}
     <div class="grid grid-cols-4 gap-4">
-      {#each stores.getGestures().getGestures() as gesture}
+      {#each stores.getGestures().getGestures() as gesture (gesture.getId())}
         <OutputGesture {gesture} {onUserInteraction} variant={'tile'} />
       {/each}
     </div>
@@ -99,7 +99,7 @@
 <MediaQuery query="(min-width: 1367px)" let:matches>
   {#if matches}
     <div class="grid grid-cols-5 gap-4">
-      {#each stores.getGestures().getGestures() as gesture}
+      {#each stores.getGestures().getGestures() as gesture (gesture.getId())}
         <OutputGesture {gesture} {onUserInteraction} variant={'tile'} />
       {/each}
     </div>

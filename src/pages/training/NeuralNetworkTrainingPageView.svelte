@@ -5,28 +5,14 @@
  -->
 <script lang="ts">
   import { stores } from '../../lib/stores/Stores';
-  import { loss, trainNNModel } from './TrainingPage';
+  import { loss } from './TrainingPage';
   import { t } from './../../i18n';
-  import Logger from '../../lib/utils/Logger';
   import { Feature, hasFeature } from '../../lib/FeatureToggles';
   import LossGraph from '../../components/features/graphs/LossGraph.svelte';
-  import StandardButton from '../../components/ui/buttons/StandardButton.svelte';
-  import Tooltip from '../../components/ui/Tooltip.svelte';
 
   const classifier = stores.getClassifier();
   const model = classifier.getModel();
-  const highlightedAxes = stores.getHighlightedAxes();
   const neuralNetworkSettings = stores.getNeuralNetworkSettings();
-
-  const trainModelClickHandler = () => {
-    trainNNModel().then(() => {
-      Logger.log('NeuralNetworkTrainingPageView', 'Model trained');
-    });
-  };
-
-  $: trainButtonSimpleLabel = !$model.hasModel
-    ? 'menu.trainer.trainModelButtonSimple'
-    : 'menu.trainer.trainNewModelButtonSimple';
 </script>
 
 <div class="flex flex-row justify-center items-center flex-grow">
@@ -46,16 +32,9 @@
           <p class="text-lg mt-4 mb-6">{$t('menu.trainer.TrainingFinished.body')}</p>
         {/if}
         <div class="relative flex justify-center">
-          <Tooltip
-            disabled={$highlightedAxes.length !== 0}
-            title={$t('menu.trainer.SelectMoreAxes')}
-            offset={{ x: 5, y: -90 }}>
-            <StandardButton
-              disabled={$highlightedAxes.length === 0}
-              onClick={trainModelClickHandler}>
-              {$t(trainButtonSimpleLabel)}
-            </StandardButton>
-          </Tooltip>
+          <p class="text-lg mt-4 mb-2">
+            Træning kan kun startes med den fysiske Jacdac-knap på Data-siden.
+          </p>
         </div>
       {/if}
       {#if $loss.length > 0 && hasFeature(Feature.LOSS_GRAPH) && ($model.isTrained || $model.isTraining)}

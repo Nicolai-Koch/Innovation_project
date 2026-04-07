@@ -16,7 +16,6 @@
   } from '../../../lib/stores/uiStore';
   import Recording from '../../ui/recording/Recording.svelte';
   import { t } from '../../../i18n';
-  import ImageSkeleton from '../../ui/skeletonloading/ImageSkeleton.svelte';
   import GestureCard from '../../ui/Card.svelte';
   import StaticConfiguration from '../../../StaticConfiguration';
   import Gesture from '../../../lib/domain/stores/gesture/Gesture';
@@ -38,14 +37,50 @@
   const enableFingerprint = stores.getEnableFingerprint();
 
   let isThisRecording = false;
+  let showDropdown = false;
+
+  const predefinedGestures = [
+    { name: 'Hoppe', icon: 'fas fa-arrow-up' },
+    { name: 'Slå', icon: 'fas fa-fist-raised' },
+    { name: 'Drejer', icon: 'fas fa-circle-notch' },
+    { name: 'Vender', icon: 'fas fa-arrows-alt-h' },
+    { name: 'Bukke', icon: 'fas fa-person' },
+    { name: 'Løbe', icon: 'fas fa-person-running' },
+  ];
 
   const nameBind = gesture.bindName();
+
+  const fallbackRowBackgroundColor = 'rgba(240, 240, 240, 0.85)';
+
+  function hexToRgba(hexColor: string, alpha: number): string | undefined {
+    const hex = hexColor.trim().replace('#', '');
+    const isValid = /^[0-9a-fA-F]{6}$/.test(hex);
+    if (!isValid) {
+      return undefined;
+    }
+
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  // Blend the class color with white to keep row backgrounds soft/pastel.
+  function getPastelBackground(hexColor: string): string {
+    return hexToRgba(hexColor, 0.2) ?? fallbackRowBackgroundColor;
+  }
 
   // When title is clicked. Remove name
   function titleClicked(): void {
     if (gesture.getName() === defaultNewName) {
       gesture.setName('');
     }
+    showDropdown = !showDropdown;
+  }
+
+  function selectPredefinedGesture(gestureName: string): void {
+    gesture.setName(gestureName);
+    showDropdown = false;
   }
 
   function removeClicked(): void {
@@ -75,6 +110,22 @@
       isThisRecording = false;
       gesture.addRecording(recording);
     });
+  }
+
+  // Single-step action: select this class (if needed) and start recording.
+  function recordFromCardClicked(e?: Event): void {
+    e?.stopPropagation();
+    if (!$devices.isInputConnected) {
+      chosenGesture.update(gesture => {
+        gesture = null;
+        return gesture;
+      });
+      onNoMicrobitSelect();
+      return;
+    }
+
+    chosenGesture.update(() => gesture);
+    recordClicked();
   }
 
   // Delete recording from recordings array
@@ -132,6 +183,15 @@
       return true;
     }
 
+    if (event.code === 'Escape') {
+      event.preventDefault();
+      showDropdown = false;
+      if (event.target instanceof HTMLElement) {
+        event.target.blur();
+      }
+      return true;
+    }
+
     if ($nameBind.length >= StaticConfiguration.gestureNameMaxLength) {
       event.preventDefault();
       alertUser(
@@ -158,19 +218,22 @@
 </script>
 
 <div class="flex-row flex">
-  <!-- Recordingbar to show recording-progress -->
-
   <div
-    class="bg-red-600 h-1.5 rounded-full absolute mt-123px ml-14px"
-    style={isThisRecording
-      ? `transition:  ${(recordingDuration / 1000).toString()}s linear; width: 97%;`
-      : 'width:0;'} />
+    class="items-center flex relative rounded-xl px-2 py-2"
+    style="background-color: {getPastelBackground($gesture.color)};">
+    <!-- Recordingbar to show recording-progress for this specific gesture row -->
+    <div class="absolute left-0 top-0 w-full h-1.5 pointer-events-none z-10">
+      <div
+        class="bg-red-600 h-1.5 rounded-full"
+        style={isThisRecording
+          ? `transition: ${(recordingDuration / 1000).toString()}s linear; width: 97%;`
+          : 'width:0;'} />
+    </div>
 
-  <div class="items-center flex relative">
     <!-- Title of gesture-->
     <GestureCard mr small>
       <div class="top-2 left-3 absolute flex flex-row justify-center items-center gap-4">
-        <GestureDot {gesture} disableTooltip={true}/>
+        <GestureDot {gesture} disableTooltip={true} editable={true} />
       </div>
       <div class="flex items-center justify-center relative p-2 w-50 h-30">
         {#if challengeNumber !== undefined}
@@ -178,16 +241,26 @@
             #{challengeNumber}
           </div>
         {/if}
-        <div
-          class="w-40 text-center
-									font-semibold transition ease
-									rounded-xl border border-gray-300
-									border-solid hover:bg-gray-100 relative">
+        <div class="w-40 text-center font-semibold transition ease rounded-xl border border-gray-300 border-solid hover:bg-gray-100 relative">
           <h3
             contenteditable
             bind:innerText={$nameBind}
             on:click={titleClicked}
             on:keypress={onTitleKeypress} />
+          
+          {#if showDropdown}
+            <div class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 max-h-64 overflow-y-auto">
+              {#each predefinedGestures as predefined (predefined.name)}
+                <button
+                  type="button"
+                  class="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-100 transition ease text-left border-b border-gray-200 last:border-b-0"
+                  on:click={() => selectPredefinedGesture(predefined.name)}>
+                  <i class="{predefined.icon} text-primarytext" />
+                  <span class="text-sm">{predefined.name}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
         </div>
         <button class="absolute right-2 top-2 outline-none">
           <i
@@ -198,28 +271,17 @@
     </GestureCard>
 
     <GestureCard small mr elevated={$chosenGesture === gesture}>
-      {#if $chosenGesture !== gesture}
-        <div class="text-center w-35 cursor-pointer" on:click={selectClicked}>
-          <div class="w-full text-center">
-            <i class="w-full h-full m-0 mt-4 p-2 fas fa-plus fa-2x text-primarytext" />
-          </div>
-          <p class="w-full text-center">
-            {$t('content.data.addData')}
-          </p>
+      <div class="text-center w-35 cursor-pointer" on:click={selectClicked}>
+        <div class="w-full text-center">
+          <i class="w-full h-full m-0 mt-4 p-2 fas fa-plus fa-2x text-primarytext" />
         </div>
-      {:else}
-        <div class="text-center w-35 cursor-pointer" on:click={selectClicked}>
-          <div class="w-full text-center">
-            <i class="w-full h-full m-0 mt-4 p-2 fas fa-check fa-2x text-secondary" />
-          </div>
-          <StandardButton
-            onClick={recordClicked}
-            small
-            shadows={false}
-            outlined
-            fillOnHover>{$t('content.data.record')}</StandardButton>
-        </div>
-      {/if}
+        <StandardButton
+          onClick={recordFromCardClicked}
+          small
+          shadows={false}
+          outlined
+          fillOnHover>Optag data</StandardButton>
+      </div>
     </GestureCard>
     <!-- Show recording for each recording -->
     {#if $gesture.recordings.length > 0}
@@ -236,16 +298,9 @@
       </GestureCard>
     {:else if $chosenGesture === gesture}
       <GestureCard small>
-        <div class="relative float-left text-left h-30 w-60 justify-start flex">
-          <div class="text-left float-left mt-auto mb-auto ml-3">
-            <ImageSkeleton
-              height={95}
-              width={140}
-              src="/imgs/microbit_record_guide.svg"
-              alt="microbit recording guide" />
-          </div>
-          <p class=" text-center absolute w-60px right-23px top-30px">
-            {$t('content.index.recordButtonDescription')}
+        <div class="h-30 w-60 flex items-center px-4">
+          <p class="text-center text-sm leading-tight">
+            Tryk på Jacdac-knappen for at optage denne bevægelse.
           </p>
         </div>
       </GestureCard>

@@ -17,6 +17,8 @@
   import ControlBar from '../components/ui/control-bar/ControlBar.svelte';
   import ContactUsControlBarButton from '../components/ui/control-bar/control-bar-items/ContactUsControlBarButton.svelte';
   import SelectLanguageControlBarDropdown from '../components/ui/control-bar/control-bar-items/SelectLanguageControlBarDropdown.svelte';
+  import StandardButton from '../components/ui/buttons/StandardButton.svelte';
+  import { Paths, navigate } from '../router/Router';
   import { t } from '../i18n';
   import Environment from '../lib/Environment';
   import DevTools from '../components/features/GoToPlaygroundButton.svelte';
@@ -48,6 +50,11 @@
         <div class="flex flex-col gap-3 text-xl">
           <div class="bg-white bg-opacity-75 rounded-xl p-4 font-semibold text-center">
             1. Optag data -> 2. Træn model -> 3. Se resultat
+          </div>
+          <div class="flex justify-center">
+            <StandardButton medium onClick={() => navigate(Paths.DATA)}>
+              Start guide
+            </StandardButton>
           </div>
         </div>
       </div>

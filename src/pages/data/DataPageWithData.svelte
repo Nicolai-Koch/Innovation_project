@@ -13,9 +13,20 @@
   import { stores } from '../../lib/stores/Stores';
   import StandardButton from '../../components/ui/buttons/StandardButton.svelte';
   import ConnectDialogContainer from '../../components/features/connection-prompt/ConnectDialogContainer.svelte';
+  import StaticConfiguration from '../../StaticConfiguration';
+  import { requestedExtraRecordingRequest } from '../../lib/stores/ExtraRecordingStore';
 
   let isConnectionDialogOpen = false;
   const gestures = stores.getGestures();
+  const minNoOfRecordingsPerGesture = StaticConfiguration.minNoOfRecordingsPerGesture;
+
+  const targetRecordingsForGesture = (gesture: { ID: number; recordings: unknown[] }) => {
+    const requestedTarget =
+      $requestedExtraRecordingRequest?.gestureId === gesture.ID
+        ? $requestedExtraRecordingRequest.targetRecordings
+        : minNoOfRecordingsPerGesture;
+    return Math.max(minNoOfRecordingsPerGesture, requestedTarget, gesture.recordings.length);
+  };
 </script>
 
 <StandardDialog
@@ -39,6 +50,20 @@
 <!-- Display all gestures -->
 <div class="flex flex-col gap-2 pt-3">
   {#each $gestures as gesture, index (gesture.ID)}
+    {@const targetRecordings = targetRecordingsForGesture(gesture)}
+    <div class="ml-2 mr-4 mb-1 w-full" style="max-width: 30rem;">
+      <div class="flex items-center justify-between text-xs text-gray-700 font-semibold mb-1">
+        <span>Optagelser: {gesture.recordings.length}/{targetRecordings}</span>
+        <span class:text-green-700={gesture.recordings.length >= targetRecordings}>
+          {gesture.recordings.length >= targetRecordings ? 'Klar til træning' : 'Mangler optagelser'}
+        </span>
+      </div>
+      <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          class="h-full bg-secondary rounded-full transition-all duration-200"
+          style={`width: ${Math.min((gesture.recordings.length / targetRecordings) * 100, 100)}%;`} />
+      </div>
+    </div>
     <Gesture
       challengeNumber={index + 1}
       gesture={gestures.getGesture(gesture.ID)}

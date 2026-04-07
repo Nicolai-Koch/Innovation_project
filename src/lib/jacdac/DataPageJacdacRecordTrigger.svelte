@@ -11,12 +11,22 @@
   } from 'jacdac-ts';
   import type { JDDevice, JDService } from 'jacdac-ts';
   import { connected, devices as jacdacDevices } from './stores';
+  import StaticConfiguration from '../../StaticConfiguration';
   import { stores } from '../stores/Stores';
-  import { buttonPressed, chosenGesture, microbitInteraction, MicrobitInteractions } from '../stores/uiStore';
+  import { chosenGesture } from '../stores/uiStore';
+  import {
+    clearRequestedExtraRecording,
+    requestedExtraRecordingRequest,
+  } from '../stores/ExtraRecordingStore';
   import { Feature, getFeature } from '../FeatureToggles';
+  import { startRecording } from '../utils/Recording';
+  import { navigate, Paths } from '../../router/Router';
+  import { trainKNNModel, trainNNModel } from '../../pages/training/TrainingPage';
+  import ModelRegistry from '../domain/ModelRegistry';
 
   let knownDevices: JDDevice[] = [];
   let triggerInProgress = false;
+  let modelTrainingInProgress = false;
   let unsubscribers: (() => void)[] = [];
   let lastTriggerAt = new Map<string, number>();
   const ledPixelCount = new Map<string, number>();
@@ -39,6 +49,49 @@
   function getLedServices(): JDService[] {
     return knownDevices.flatMap((device) =>
       device.services().filter((service: JDService) => service.serviceClass === SRV_LED)
+    );
+  }
+
+  function getNextGestureToRecord() {
+    return stores
+      .getGestures()
+      .getGestures()
+      .find(gesture => gesture.getRecordings().length < StaticConfiguration.minNoOfRecordingsPerGesture);
+  }
+
+  function getRequestedExtraRecordingContext() {
+    const request = get(requestedExtraRecordingRequest);
+    if (!request) return null;
+
+    const gesture = stores
+      .getGestures()
+      .getGestures()
+      .find(item => item.getId() === request.gestureId);
+
+    if (!gesture) {
+      clearRequestedExtraRecording();
+      return null;
+    }
+
+    if (gesture.getRecordings().length >= request.targetRecordings) {
+      clearRequestedExtraRecording();
+      return null;
+    }
+
+    return {
+      gesture,
+      targetRecordings: request.targetRecordings,
+    };
+  }
+
+  function hasEnoughDataToTrain() {
+    const gestures = stores.getGestures().getGestures();
+    return (
+      gestures.length >= StaticConfiguration.minNoOfGestures &&
+      gestures.every(
+        gesture =>
+          gesture.getRecordings().length >= StaticConfiguration.minNoOfRecordingsPerGesture,
+      )
     );
   }
 
@@ -94,6 +147,26 @@
     await service.register(LedReg.Pixels).sendSetPackedAsync([pixels], true);
   }
 
+  async function setProgressLeds(service: JDService | undefined, litCount: number) {
+    if (!service) return;
+
+    const count = await getLedPixelCount(service);
+    if (!count) return;
+
+    const activeLeds = Math.min(count, 8);
+    const safeLitCount = Math.max(0, Math.min(litCount, activeLeds));
+    const pixels = new Uint8Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      const isLit = i < safeLitCount;
+      pixels[i * 3] = isLit ? 0 : 0;
+      pixels[i * 3 + 1] = isLit ? 180 : 0;
+      pixels[i * 3 + 2] = isLit ? 255 : 0;
+    }
+
+    await service.register(LedReg.Pixels).sendSetPackedAsync([pixels], true);
+  }
+
   function resolveLedService(buttonService: JDService): JDService | undefined {
     const sameDeviceLed = buttonService.device
       ?.services()
@@ -104,27 +177,84 @@
   }
 
   function triggerDataRecording() {
-    const gestures = stores.getGestures().getGestures();
-    const topGesture = gestures[0];
-    if (!topGesture) return;
+    const requestedContext = getRequestedExtraRecordingContext();
+    const gesture = requestedContext?.gesture ?? getNextGestureToRecord();
+    if (!gesture) return false;
 
-    chosenGesture.set(topGesture);
+    chosenGesture.set(gesture);
+    startRecording(recording => {
+      gesture.addRecording(recording);
+      if (
+        requestedContext &&
+        requestedContext.gesture.getId() === gesture.getId() &&
+        gesture.getRecordings().length >= requestedContext.targetRecordings
+      ) {
+        clearRequestedExtraRecording();
+      }
+      const next = getNextGestureToRecord();
+      chosenGesture.set(next ?? gesture);
+    });
 
-    const interaction = get(microbitInteraction);
-    if (interaction === MicrobitInteractions.A) {
-      buttonPressed.set({ buttonA: 1, buttonB: 0 });
-    } else if (interaction === MicrobitInteractions.B) {
-      buttonPressed.set({ buttonA: 0, buttonB: 1 });
-    } else {
-      buttonPressed.set({ buttonA: 1, buttonB: 1 });
+    return true;
+  }
+
+  async function trainModelFromDataPage(ledService: JDService | undefined) {
+    if (modelTrainingInProgress) return;
+
+    modelTrainingInProgress = true;
+    const model = stores.getClassifier().getModel();
+    const minLedSteps = 8;
+    const ledStepDelayMs = 280;
+
+    try {
+      const trainingPromise = get(stores.getSelectedModel()).id === ModelRegistry.KNN.id
+        ? trainKNNModel()
+        : trainNNModel();
+
+      for (let step = 1; step <= minLedSteps; step++) {
+        await setProgressLeds(ledService, step);
+        await delay(ledStepDelayMs);
+      }
+
+      while (model.isTraining()) {
+        await setProgressLeds(ledService, minLedSteps);
+        await delay(160);
+      }
+
+      await trainingPromise;
+      await setLedColor(ledService, 0, 0, 0);
+      navigate(Paths.MODEL);
+    } catch (e) {
+      console.error('Jacdac model training failed:', e);
+      await setLedColor(ledService, 255, 0, 0);
+      await delay(1000);
+      await setLedColor(ledService, 0, 0, 0);
+    } finally {
+      modelTrainingInProgress = false;
     }
   }
 
   async function runLedAndRecord(buttonService: JDService) {
+    if (modelTrainingInProgress) return;
+
+    const requestedExtraContext = getRequestedExtraRecordingContext();
+    const hasRecordingTarget = !!getNextGestureToRecord();
+    const ledService = resolveLedService(buttonService);
+
+    if (!requestedExtraContext && hasEnoughDataToTrain()) {
+      await trainModelFromDataPage(ledService);
+      return;
+    }
+
+    // If all current classes are filled and we do not yet have enough data to train,
+    // do nothing until the user adds a new class.
+    if (!hasRecordingTarget && !requestedExtraContext) {
+      return;
+    }
+
     if (triggerInProgress) return;
     triggerInProgress = true;
 
-    const ledService = resolveLedService(buttonService);
     const recordingDuration = getFeature<number>(Feature.RECORDING_DURATION);
     const countdownDuration = 3000;
 
@@ -138,7 +268,13 @@
       await setCountdownWhiteLeds(ledService, 0);
       await setLedColor(ledService, 0, 255, 0);
 
-      triggerDataRecording();
+      const didStartRecording = triggerDataRecording();
+      if (!didStartRecording) {
+        await setLedColor(ledService, 255, 180, 0);
+        await delay(800);
+        await setLedColor(ledService, 0, 0, 0);
+        return;
+      }
 
       await delay(recordingDuration + 80);
 
@@ -209,3 +345,88 @@
     };
   });
 </script>
+
+{#if modelTrainingInProgress}
+  <div
+    class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40"
+    style="z-index: 99999; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);">
+    <div class="ai-loading-modal w-[22rem] max-w-[92vw] rounded-2xl bg-white p-6 shadow-2xl">
+      <div class="mx-auto mb-4 h-24 w-24">
+        <div class="ai-loader relative h-full w-full">
+          <span class="ai-ring ai-ring-1" />
+          <span class="ai-ring ai-ring-2" />
+          <span class="ai-ring ai-ring-3" />
+          <span class="ai-core">AI</span>
+        </div>
+      </div>
+      <p class="text-center text-lg font-semibold">Træner model...</p>
+      <p class="mt-2 text-center text-sm text-gray-600">
+        Vent et oejeblik mens modellen lærer dine bevægelser.
+      </p>
+    </div>
+  </div>
+{/if}
+
+<style>
+  .ai-loading-modal {
+    border: 1px solid rgba(196, 208, 227, 0.9);
+  }
+
+  .ai-loader {
+    display: grid;
+    place-items: center;
+  }
+
+  .ai-ring {
+    position: absolute;
+    border-radius: 9999px;
+    border: 3px solid transparent;
+  }
+
+  .ai-ring-1 {
+    width: 100%;
+    height: 100%;
+    border-top-color: #38bdf8;
+    border-right-color: #22d3ee;
+    animation: spin-clockwise 1.15s linear infinite;
+  }
+
+  .ai-ring-2 {
+    width: 72%;
+    height: 72%;
+    border-bottom-color: #6366f1;
+    border-left-color: #818cf8;
+    animation: spin-counter 0.95s linear infinite;
+  }
+
+  .ai-ring-3 {
+    width: 44%;
+    height: 44%;
+    border-top-color: #06b6d4;
+    border-left-color: #0ea5e9;
+    animation: spin-clockwise 0.75s linear infinite;
+  }
+
+  .ai-core {
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #0f172a;
+    background: linear-gradient(120deg, #38bdf8, #6366f1);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  @keyframes spin-clockwise {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes spin-counter {
+    to {
+      transform: rotate(-360deg);
+    }
+  }
+</style>

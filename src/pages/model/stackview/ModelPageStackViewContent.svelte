@@ -5,7 +5,6 @@
  -->
 <script lang="ts">
   import { fade } from 'svelte/transition';
-  import Information from '../../../components/ui/information/Information.svelte';
   import { t } from './../../../i18n';
   import { stores } from '../../../lib/stores/Stores';
   import OutputGesture from '../../../components/features/model/ModelGesture.svelte';
@@ -23,33 +22,18 @@
 </script>
 
 <div>
-  <div class="relative flex h-8">
-    <div class="absolute left-5 flex">
-      <Information
-        isLightTheme={false}
-        iconText={$t('content.model.output.prediction.iconTitle')}
-        titleText={$t('content.model.output.prediction.descriptionTitle')}
-        bodyText={$t('content.model.output.prediction.descriptionBody')} />
-    </div>
-    <div class="absolute left-78 flex">
-      <Information
-        isLightTheme={false}
-        iconText={$t('content.model.output.ledOutput.descriptionTitle')}
-        titleText={$t('content.model.output.ledOutput.descriptionTitle')}
-        bodyText={$t('content.model.output.ledOutput.descriptionBody')} />
-    </div>
-    <div class="absolute left-125 flex">
-      <Information
-        isLightTheme={false}
-        iconText={$t('content.model.output.sound.iconTitle')}
-        titleText={$t('content.model.output.sound.descriptionTitle')}
-        bodyText={$t('content.model.output.sound.descriptionBody')} />
-    </div>
+  <div
+    class="mb-2 grid h-8 items-end text-sm font-bold"
+    style="grid-template-columns: 7rem 19rem 12rem 10rem;">
+    <p class="text-center">Vælg udfordring</p>
+    <p class="text-center">Forudsigelse</p>
+    <p class="text-center">LED output</p>
+    <p class="text-center">Lyd</p>
   </div>
 
   <div class="pl-1">
     <!-- Display all gestures and their output capabilities -->
-    {#each gestures.getGestures() as gesture}
+    {#each gestures.getGestures() as gesture (gesture.getId())}
       <OutputGesture variant="stack" {gesture} {onUserInteraction} />
     {/each}
   </div>

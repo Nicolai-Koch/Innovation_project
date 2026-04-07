@@ -6,7 +6,6 @@
 
 import { SvelteComponent } from 'svelte';
 import DataMenu from './DataMenu.svelte';
-import NewTrainerMenu from './TrainingMenu.svelte';
 import ModelMenu from './ModelMenu.svelte';
 import ValidateMenu from './ValidateMenu.svelte';
 import { Paths, type PathType } from '../../router/Router';
@@ -40,15 +39,6 @@ class Menus {
             navigationPath: Paths.DATA,
           },
           {
-            title: 'menu.trainer.helpHeading',
-            infoBubbleTitle: 'menu.trainer.helpHeading',
-            infoBubbleContent: 'menu.trainer.helpBody',
-            collapsedButtonContent: undefined,
-            expandedButtonContent: NewTrainerMenu,
-            navigationPath: Paths.TRAINING,
-            additionalExpandPaths: [Paths.FILTERS],
-          },
-          {
             title: 'menu.validate.helpHeading',
             infoBubbleTitle: 'menu.validate.helpHeading',
             infoBubbleContent: 'menu.validate.helpBody',
@@ -75,15 +65,6 @@ class Menus {
             collapsedButtonContent: undefined,
             expandedButtonContent: DataMenu,
             navigationPath: Paths.DATA,
-          },
-          {
-            title: 'menu.trainer.helpHeading',
-            infoBubbleTitle: 'menu.trainer.helpHeading',
-            infoBubbleContent: 'menu.trainer.helpBody',
-            collapsedButtonContent: undefined,
-            expandedButtonContent: NewTrainerMenu,
-            navigationPath: Paths.TRAINING,
-            additionalExpandPaths: [Paths.FILTERS],
           },
           {
             title: 'menu.model.helpHeading',

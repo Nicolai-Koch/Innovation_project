@@ -41,9 +41,9 @@
 </script>
 
 {#if variant === 'stack'}
-  <OutputGestureStack {gesture} {onUserInteraction} />
+  <OutputGestureStack {gesture} challengeNumber={0} {onUserInteraction} />
 {/if}
 
 {#if variant === 'tile'}
-  <OutputGestureTile {gesture} />
+  <OutputGestureTile {gesture} challengeNumber={0} />
 {/if}

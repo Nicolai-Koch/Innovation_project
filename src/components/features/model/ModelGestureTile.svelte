@@ -18,11 +18,17 @@
   // IMPORT AND DEFAULTS
   import { t } from '../../../i18n';
   import type Gesture from '../../../lib/domain/stores/gesture/Gesture';
+  import { navigate, Paths } from '../../../router/Router';
+  import { chosenGesture } from '../../../lib/stores/uiStore';
+  import { requestExtraRecordingForGesture } from '../../../lib/stores/ExtraRecordingStore';
   import Card from '../../ui/Card.svelte';
+  import GestureDot from '../../ui/GestureDot.svelte';
   import Information from '../../ui/information/Information.svelte';
+  import ModelChallengeSelect from './ModelChallengeSelect.svelte';
 
   // Variables for component
   export let gesture: Gesture;
+  export let challengeNumber: number = 0;
 
   let sliderValue = $gesture.confidence.requiredConfidence * 100;
   $: {
@@ -35,16 +41,56 @@
   const noTypeCheckNonStandardOrientProp = (orient?: 'vertical' | 'horizontal'): any => ({
     orient,
   });
+
+  const addExtraRecording = () => {
+    requestExtraRecordingForGesture(gesture.getId(), gesture.getRecordings().length + 1);
+    chosenGesture.set(gesture);
+    navigate(Paths.DATA);
+  };
+
+  const fallbackRowBackgroundColor = 'rgba(240, 240, 240, 0.85)';
+
+  function hexToRgba(hexColor: string, alpha: number): string | undefined {
+    const hex = hexColor.trim().replace('#', '');
+    const isValid = /^[0-9a-fA-F]{6}$/.test(hex);
+    if (!isValid) {
+      return undefined;
+    }
+
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function getPastelBackground(hexColor: string): string {
+    return hexToRgba(hexColor, 0.2) ?? fallbackRowBackgroundColor;
+  }
 </script>
 
-<Card>
-  <div class="items-center h-full my-auto justify-between flex p-2">
+<div data-challenge-number={challengeNumber}>
+  <Card>
     <div
-      class="w-36 text-center font-semibold rounded-xl
-                    px-1 py-1 border border-gray-300
-                    border-dashed mr-2 break-words">
-      <h3>{$gesture.name}</h3>
-    </div>
+      class="items-center h-full my-auto justify-between flex gap-2 p-2 rounded-xl"
+      style="background-color: {getPastelBackground($gesture.color)};">
+      <ModelChallengeSelect {gesture} />
+      <div class="mr-2 flex flex-col items-center">
+        <div
+          class="w-36 text-center font-semibold rounded-xl
+                      px-1 py-1 border border-gray-300
+                      border-dashed break-words bg-white">
+          <div class="flex justify-center mb-1">
+            <GestureDot {gesture} editable={true} />
+          </div>
+          <h3>{$gesture.name}</h3>
+        </div>
+        <button
+          type="button"
+          class="mt-2 rounded border border-primaryborder px-2 py-1 text-xs font-semibold hover:bg-white"
+          on:click={addExtraRecording}>
+          Tilføj 1 optagelse
+        </button>
+      </div>
 
     <!-- METER -->
     <div class="flex">
@@ -90,5 +136,6 @@
           isLightTheme={false} />
       </div>
     </div>
-  </div>
-</Card>
+    </div>
+  </Card>
+</div>

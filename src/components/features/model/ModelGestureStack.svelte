@@ -18,13 +18,17 @@
   import { t } from '../../../i18n';
   import type { SoundData } from '../../../lib/domain/stores/gesture/Gesture';
   import type Gesture from '../../../lib/domain/stores/gesture/Gesture';
+  import { navigate, Paths } from '../../../router/Router';
   import Microbits from '../../../lib/microbit-interfacing/Microbits';
   import { stores } from '../../../lib/stores/Stores';
+  import { chosenGesture } from '../../../lib/stores/uiStore';
   import StaticConfiguration from '../../../StaticConfiguration';
+  import { requestExtraRecordingForGesture } from '../../../lib/stores/ExtraRecordingStore';
   import Card from '../../ui/Card.svelte';
   import GestureDot from '../../ui/GestureDot.svelte';
   import Information from '../../ui/information/Information.svelte';
   import ImageSkeleton from '../../ui/skeletonloading/ImageSkeleton.svelte';
+  import ModelChallengeSelect from './ModelChallengeSelect.svelte';
 
   // IMPORT AND DEFAULTS
   import OutputMatrix from './ModelMatrix.svelte';
@@ -38,6 +42,7 @@
 
   // Variables for component
   export let gesture: Gesture;
+  export let challengeNumber: number = 0;
   export let onUserInteraction: () => void = () => {
     return;
   };
@@ -179,6 +184,12 @@
     setOutputPin(false);
   };
 
+  const addExtraRecording = () => {
+    requestExtraRecordingForGesture(gesture.getId(), gesture.getRecordings().length + 1);
+    chosenGesture.set(gesture);
+    navigate(Paths.DATA);
+  };
+
   let sliderValue = requiredConfidence * 100;
   $: {
     gesture.getConfidence().setRequiredConfidence(sliderValue / 100);
@@ -188,24 +199,55 @@
 
   $: meterHeightPct = 100 * $gesture.confidence.currentConfidence;
 
+  const fallbackRowBackgroundColor = 'rgba(240, 240, 240, 0.85)';
+
+  function hexToRgba(hexColor: string, alpha: number): string | undefined {
+    const hex = hexColor.trim().replace('#', '');
+    const isValid = /^[0-9a-fA-F]{6}$/.test(hex);
+    if (!isValid) {
+      return undefined;
+    }
+
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function getPastelBackground(hexColor: string): string {
+    return hexToRgba(hexColor, 0.2) ?? fallbackRowBackgroundColor;
+  }
+
   const noTypeCheckNonStandardOrientProp = (orient?: 'vertical' | 'horizontal'): any => ({
     orient,
   });
 </script>
 
-<main class="mb-4 items-center flex flex-row">
+<main class="mb-4 flex flex-row items-stretch" data-challenge-number={challengeNumber}>
+  <ModelChallengeSelect {gesture} />
+
   <!-- NAMES AND CONFIDENCE METER -->
   <Card>
-    <div class="relative">
+    <div
+      class="relative rounded-xl h-full px-2"
+      style="background-color: {getPastelBackground($gesture.color)};">
       <div class="absolute top-3 left-3">
-        <GestureDot {gesture} />
+        <GestureDot {gesture} editable={true} />
       </div>
-      <div class="items-center flex p-2">
-        <div
-          class="w-36 text-center font-semibold rounded-xl
-                      px-1 py-1 border border-gray-300
-                      border-dashed mr-2 break-words">
-          <h3>{$gesture.name}</h3>
+      <div class="items-center flex h-full p-2">
+        <div class="mr-2 flex flex-col items-center">
+          <div
+            class="w-36 text-center font-semibold rounded-xl
+                        px-1 py-1 border border-gray-300
+                        border-dashed break-words bg-white">
+            <h3>{$gesture.name}</h3>
+          </div>
+          <button
+            type="button"
+            class="mt-2 rounded border border-primaryborder px-2 py-1 text-xs font-semibold hover:bg-white"
+            on:click={addExtraRecording}>
+            Tilføj 1 optagelse
+          </button>
         </div>
         <div class="h-31" />
         <input
