@@ -5,19 +5,17 @@
  -->
 
 <script lang="ts">
-  import { t } from '../../i18n';
   import { stores } from '../../lib/stores/Stores';
 
   const gestures = stores.getGestures();
 
-  // Count of amount of recordings
-  $: numberOfRecodings = $gestures.reduce(
-    (sum, val) => (sum += val.recordings.length),
-    0,
-  );
+  $: numberOfClasses = $gestures.length;
 </script>
 
 <div class="w-full text-center justify-center pt-5 pb-7">
-  <p class="text-7xl mb-4">{numberOfRecodings}</p>
-  <p class="text-xl">{$t('menu.data.examples')}</p>
+  <div class="text-3xl mb-3 text-secondarytext">
+    <i class="fas fa-robot" aria-hidden="true" />
+  </div>
+  <p class="text-7xl mb-4">{numberOfClasses}</p>
+  <p class="text-xl">Antal bevægelser</p>
 </div>

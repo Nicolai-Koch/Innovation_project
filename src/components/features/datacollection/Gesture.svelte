@@ -23,12 +23,10 @@
   import type { RecordingData } from '../../../lib/domain/RecordingData';
   import { startRecording } from '../../../lib/utils/Recording';
   import GestureDot from '../../ui/GestureDot.svelte';
-  import StandardButton from '../../ui/buttons/StandardButton.svelte';
   import { Feature, getFeature } from '../../../lib/FeatureToggles';
 
   export let onNoMicrobitSelect: () => void;
   export let gesture: Gesture;
-  export let challengeNumber: number | undefined = undefined;
   const devices = stores.getDevices();
   const gestures = stores.getGestures();
 
@@ -49,6 +47,7 @@
   ];
 
   const nameBind = gesture.bindName();
+  const minRecordingsRequired = StaticConfiguration.minNoOfRecordingsPerGesture;
 
   const fallbackRowBackgroundColor = 'rgba(240, 240, 240, 0.85)';
 
@@ -110,22 +109,6 @@
       isThisRecording = false;
       gesture.addRecording(recording);
     });
-  }
-
-  // Single-step action: select this class (if needed) and start recording.
-  function recordFromCardClicked(e?: Event): void {
-    e?.stopPropagation();
-    if (!$devices.isInputConnected) {
-      chosenGesture.update(gesture => {
-        gesture = null;
-        return gesture;
-      });
-      onNoMicrobitSelect();
-      return;
-    }
-
-    chosenGesture.update(() => gesture);
-    recordClicked();
   }
 
   // Delete recording from recordings array
@@ -222,10 +205,10 @@
     class="items-center flex relative rounded-xl px-2 py-2"
     style="background-color: {getPastelBackground($gesture.color)};">
     <!-- Recordingbar to show recording-progress for this specific gesture row -->
-    <div class="absolute left-0 top-0 w-full h-1.5 pointer-events-none z-10">
+    <div class="absolute left-0 top-0 w-full h-2 pointer-events-none z-20">
       <div
-        class="bg-red-600 h-1.5 rounded-full"
-        style={isThisRecording
+        class="bg-green-500 h-2 rounded-full"
+        style={(isThisRecording || ($devices.isRecording && $chosenGesture === gesture))
           ? `transition: ${(recordingDuration / 1000).toString()}s linear; width: 97%;`
           : 'width:0;'} />
     </div>
@@ -236,11 +219,6 @@
         <GestureDot {gesture} disableTooltip={true} editable={true} />
       </div>
       <div class="flex items-center justify-center relative p-2 w-50 h-30">
-        {#if challengeNumber !== undefined}
-          <div class="absolute top-3 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-bold z-10 pointer-events-none">
-            #{challengeNumber}
-          </div>
-        {/if}
         <div class="w-40 text-center font-semibold transition ease rounded-xl border border-gray-300 border-solid hover:bg-gray-100 relative">
           <h3
             contenteditable
@@ -271,16 +249,24 @@
     </GestureCard>
 
     <GestureCard small mr elevated={$chosenGesture === gesture}>
-      <div class="text-center w-35 cursor-pointer" on:click={selectClicked}>
-        <div class="w-full text-center">
-          <i class="w-full h-full m-0 mt-4 p-2 fas fa-plus fa-2x text-primarytext" />
+      <div class="text-center w-35">
+        <div class="h-30 w-full flex flex-col items-center justify-center px-3 gap-2">
+          {#if $gesture.recordings.length >= minRecordingsRequired}
+            <p class="text-center text-sm leading-tight font-semibold text-green-600 flex items-center gap-1">
+              Klar til træning
+              <i class="fas fa-check text-green-600" />
+            </p>
+          {:else}
+            <p class="text-center text-sm leading-tight font-semibold text-primarytext">
+              Tryk på knap 
+              -> optag bevægelse
+            </p>
+            <img
+              src="/imgs/jacdac_knap.png"
+              alt="Jacdac knap"
+              class="h-10 w-auto object-contain" />
+          {/if}
         </div>
-        <StandardButton
-          onClick={recordFromCardClicked}
-          small
-          shadows={false}
-          outlined
-          fillOnHover>Optag data</StandardButton>
       </div>
     </GestureCard>
     <!-- Show recording for each recording -->
@@ -294,14 +280,6 @@
               gestureId={$gesture.ID}
               onDelete={deleteRecording} />
           {/each}
-        </div>
-      </GestureCard>
-    {:else if $chosenGesture === gesture}
-      <GestureCard small>
-        <div class="h-30 w-60 flex items-center px-4">
-          <p class="text-center text-sm leading-tight">
-            Tryk på Jacdac-knappen for at optage denne bevægelse.
-          </p>
         </div>
       </GestureCard>
     {/if}

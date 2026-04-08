@@ -10,6 +10,9 @@
   import { stores } from '../../lib/stores/Stores';
 
   const model = stores.getClassifier().getModel();
+  const gestures = stores.getGestures();
+
+  $: readyToTrain = gestures.hasSufficientData() && !$model.isTrained;
 </script>
 
 <div class="h-40 w-40 m-auto mt-2 flex flex-col justify-center">
@@ -25,6 +28,15 @@
       <p class="text-white mt-3 mb-4">
         {$t('menu.trainer.TrainingFinished')}
       </p>
+    </div>
+  {:else if readyToTrain}
+    <div
+      class="h-34 w-34 m-auto mb-8 border-2 border-white border-opacity-30 rounded-lg border-dashed font-bold text-white">
+      <div class="flex h-full px-3">
+        <div class="m-auto text-center text-sm">
+          Klar til at træne model
+        </div>
+      </div>
     </div>
   {:else}
     <div

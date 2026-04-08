@@ -6,6 +6,7 @@
 
 import { SvelteComponent } from 'svelte';
 import DataMenu from './DataMenu.svelte';
+import TrainingMenu from './TrainingMenu.svelte';
 import ModelMenu from './ModelMenu.svelte';
 import ValidateMenu from './ValidateMenu.svelte';
 import { Paths, type PathType } from '../../router/Router';
@@ -16,6 +17,9 @@ export interface MenuProperties {
   title: string;
   infoBubbleTitle: string;
   infoBubbleContent: string;
+  showInfo?: boolean;
+  underlineTitle?: boolean;
+  disabled?: boolean;
   navigationPath: PathType;
   collapsedButtonContent: typeof SvelteComponent<any> | undefined;
   expandedButtonContent: typeof SvelteComponent<any>;
@@ -34,9 +38,22 @@ class Menus {
             title: 'menu.data.helpHeading',
             infoBubbleTitle: 'menu.data.helpHeading',
             infoBubbleContent: 'menu.data.helpBody',
+            showInfo: false,
+            underlineTitle: false,
             collapsedButtonContent: undefined,
             expandedButtonContent: DataMenu,
             navigationPath: Paths.DATA,
+          },
+          {
+            title: 'menu.trainer.trainModelButtonSimple',
+            infoBubbleTitle: 'menu.trainer.helpHeading',
+            infoBubbleContent: 'menu.trainer.helpBody',
+            showInfo: false,
+            underlineTitle: false,
+            disabled: true,
+            collapsedButtonContent: undefined,
+            expandedButtonContent: TrainingMenu,
+            navigationPath: Paths.TRAINING,
           },
           {
             title: 'menu.validate.helpHeading',
@@ -51,6 +68,8 @@ class Menus {
             title: 'menu.model.helpHeading',
             infoBubbleTitle: 'menu.model.helpHeading',
             infoBubbleContent: 'menu.model.helpBody',
+            showInfo: false,
+            underlineTitle: false,
             collapsedButtonContent: undefined,
             expandedButtonContent: ModelMenu,
             navigationPath: Paths.MODEL,
@@ -62,14 +81,29 @@ class Menus {
             title: 'menu.data.helpHeading',
             infoBubbleTitle: 'menu.data.helpHeading',
             infoBubbleContent: 'menu.data.helpBody',
+            showInfo: false,
+            underlineTitle: false,
             collapsedButtonContent: undefined,
             expandedButtonContent: DataMenu,
             navigationPath: Paths.DATA,
           },
           {
+            title: 'menu.trainer.trainModelButtonSimple',
+            infoBubbleTitle: 'menu.trainer.helpHeading',
+            infoBubbleContent: 'menu.trainer.helpBody',
+            showInfo: false,
+            underlineTitle: false,
+            disabled: true,
+            collapsedButtonContent: undefined,
+            expandedButtonContent: TrainingMenu,
+            navigationPath: Paths.TRAINING,
+          },
+          {
             title: 'menu.model.helpHeading',
             infoBubbleTitle: 'menu.model.helpHeading',
             infoBubbleContent: 'menu.model.helpBody',
+            showInfo: false,
+            underlineTitle: false,
             collapsedButtonContent: undefined,
             expandedButtonContent: ModelMenu,
             navigationPath: Paths.MODEL,

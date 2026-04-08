@@ -7,10 +7,7 @@
 <script lang="ts">
   import NewGestureButton from '../../components/features/NewGestureButton.svelte';
   import PleaseConnect from '../../components/features/PleaseConnect.svelte';
-  import StandardButton from '../../components/ui/buttons/StandardButton.svelte';
-  import { t } from '../../i18n';
   import { stores } from '../../lib/stores/Stores';
-  import { importExampleDataset } from './DataPage';
 
   const devices = stores.getDevices();
 </script>
@@ -23,19 +20,7 @@
       </div>
     {/if}
     {#if $devices.isInputConnected}
-      <div class="flex justify-center">
-        <div class="text-center text-xl w-1/2 text-bold text-primarytext">
-          <p>{$t('content.data.noData')}</p>
-        </div>
-      </div>
       <NewGestureButton />
     {/if}
-  </div>
-  <div>
-    <div class="flex mt-3 mb-3 justify-center">
-      <StandardButton onClick={importExampleDataset}>
-        {$t('content.data.noData.templateDataButton')}
-      </StandardButton>
-    </div>
   </div>
 </div>

@@ -4,36 +4,172 @@
   SPDX-License-Identifier: MIT
  -->
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { fade } from 'svelte/transition';
   import { t } from './../../../i18n';
+  import { activeChallengeNumber } from '../../../lib/stores/BoardGameChallengeStore';
   import { stores } from '../../../lib/stores/Stores';
   import OutputGesture from '../../../components/features/model/ModelGesture.svelte';
 
   const devices = stores.getDevices();
   const gestures = stores.getGestures();
+  const bestPrediction = gestures.getBestPrediction();
   // Bool flags to know whether output microbit popup should be show
   let hasClosedPopup = false;
+  let timerSecondsLeft = 5;
+  let timerRunning = false;
+  let timerFinished = false;
+  let timerInterval: ReturnType<typeof setInterval> | undefined;
+  let previousChallengeNumber: number | null = null;
 
   let hasInteracted = false;
 
   function onUserInteraction(): void {
     hasInteracted = true;
   }
+
+  function clearChallengeTimer(): void {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = undefined;
+    }
+  }
+
+  function startChallengeTimer(): void {
+    clearChallengeTimer();
+    timerSecondsLeft = 5;
+    timerFinished = false;
+    timerRunning = true;
+
+    timerInterval = setInterval(() => {
+      timerSecondsLeft -= 1;
+      if (timerSecondsLeft <= 0) {
+        clearChallengeTimer();
+        timerSecondsLeft = 0;
+        timerRunning = false;
+        timerFinished = true;
+      }
+    }, 1000);
+  }
+
+  function retryChallenge(): void {
+    if (!challengeGesture) return;
+    startChallengeTimer();
+  }
+
+  $: challengeGesture =
+    $activeChallengeNumber === null
+      ? undefined
+      : $gestures[$activeChallengeNumber - 1];
+
+  $: guessedGesture =
+    $bestPrediction === undefined
+      ? undefined
+      : $gestures.find(gesture => gesture.ID === $bestPrediction.getId());
+
+  $: guessedConfident = guessedGesture?.confidence?.isConfident ?? false;
+
+  $: guessedCorrect =
+    !!challengeGesture &&
+    !!guessedGesture &&
+    guessedConfident &&
+    guessedGesture.ID === challengeGesture.ID;
+
+  $: {
+    if ($activeChallengeNumber !== previousChallengeNumber) {
+      previousChallengeNumber = $activeChallengeNumber;
+      if ($activeChallengeNumber === null) {
+        clearChallengeTimer();
+        timerRunning = false;
+        timerFinished = false;
+        timerSecondsLeft = 5;
+      } else {
+        startChallengeTimer();
+      }
+    }
+  }
+
+  $: {
+    if (guessedCorrect && timerRunning) {
+      clearChallengeTimer();
+      timerRunning = false;
+      timerFinished = false;
+    }
+  }
+
+  $: gameFeedback = (() => {
+    if (!challengeGesture) {
+      return {
+        text: 'Vaelg udfordring',
+        classes: 'bg-blue-50 text-blue-800 border-blue-200',
+        canRetry: false,
+      };
+    }
+
+    if (guessedCorrect) {
+      return {
+        text: '✅ You did it!',
+        classes: 'bg-green-50 text-green-800 border-green-200',
+        canRetry: false,
+      };
+    }
+
+    if (timerRunning) {
+      return {
+        text: `Go! ${timerSecondsLeft}s`,
+        classes: 'bg-blue-50 text-blue-800 border-blue-200',
+        canRetry: false,
+      };
+    }
+
+    if (timerFinished) {
+      return {
+        text: '❌ Try again',
+        classes: 'bg-red-50 text-red-800 border-red-200',
+        canRetry: true,
+      };
+    }
+
+    return {
+      text: 'Tryk knappen',
+      classes: 'bg-blue-50 text-blue-800 border-blue-200',
+      canRetry: false,
+    };
+  })();
+
+  onDestroy(() => {
+    clearChallengeTimer();
+  });
 </script>
 
 <div>
+  <div class={`mb-2 rounded-xl border px-3 py-2 text-center text-sm font-semibold ${gameFeedback.classes}`}>
+    <div class="flex items-center justify-center gap-3">
+      <span>{gameFeedback.text}</span>
+      {#if gameFeedback.canRetry}
+        <button
+          type="button"
+          class="rounded border border-current px-2 py-1 text-xs font-semibold"
+          on:click={retryChallenge}>
+          Proev igen
+        </button>
+      {/if}
+    </div>
+  </div>
+
   <div
     class="mb-2 grid h-8 items-end text-sm font-bold"
     style="grid-template-columns: 7rem 19rem 12rem 10rem;">
     <p class="text-center">Vælg udfordring</p>
-    <p class="text-center">Forudsigelse</p>
+    <p class="text-center">Robot gaetter</p>
     <p class="text-center">LED output</p>
     <p class="text-center">Lyd</p>
   </div>
 
   <div class="pl-1">
     <!-- Display all gestures and their output capabilities -->
-    {#each gestures.getGestures() as gesture (gesture.getId())}
+    {#each $gestures as gestureData (gestureData.ID)}
+      {@const gesture = gestures.getGesture(gestureData.ID)}
       <OutputGesture variant="stack" {gesture} {onUserInteraction} />
     {/each}
   </div>

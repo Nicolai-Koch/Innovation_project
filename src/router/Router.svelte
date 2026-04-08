@@ -63,17 +63,9 @@
   };
 
   const navigateFromUrl = () => {
-    let urlPath = window.location.pathname;
-    if (urlPath.startsWith('/')) {
-      urlPath = urlPath.substring(1, urlPath.length);
-    }
-    let path: PathType = Paths.HOME;
-    if (Object.values(Paths).includes(urlPath as PathType)) {
-      path = urlPath as PathType;
-      navigate(path);
-    } else {
-      history.replaceState({}, '', Paths.HOME);
-    }
+    // Always start from home after a full page reload.
+    navigate(Paths.HOME);
+    history.replaceState({ path: Paths.HOME }, '', Paths.HOME);
   };
   navigateFromUrl();
 

@@ -14,3 +14,4 @@ export enum ModelView {
 export const modelView = writable<ModelView>(ModelView.STACK);
 
 export const isLoading = writable<boolean>(true);
+export const modelTrainingInProgress = writable<boolean>(false);

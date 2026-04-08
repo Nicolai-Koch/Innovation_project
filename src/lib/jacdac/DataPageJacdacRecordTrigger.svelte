@@ -13,7 +13,7 @@
   import { connected, devices as jacdacDevices } from './stores';
   import StaticConfiguration from '../../StaticConfiguration';
   import { stores } from '../stores/Stores';
-  import { chosenGesture } from '../stores/uiStore';
+  import { chosenGesture, alertUser } from '../stores/uiStore';
   import {
     clearRequestedExtraRecording,
     requestedExtraRecordingRequest,
@@ -21,12 +21,12 @@
   import { Feature, getFeature } from '../FeatureToggles';
   import { startRecording } from '../utils/Recording';
   import { navigate, Paths } from '../../router/Router';
-  import { trainKNNModel, trainNNModel } from '../../pages/training/TrainingPage';
+  import { trainKNNModel, trainNNModel } from '../../pages/training/TrainingPage.ts';
   import ModelRegistry from '../domain/ModelRegistry';
+  import { modelTrainingInProgress } from '../stores/ApplicationState';
 
   let knownDevices: JDDevice[] = [];
   let triggerInProgress = false;
-  let modelTrainingInProgress = false;
   let unsubscribers: (() => void)[] = [];
   let lastTriggerAt = new Map<string, number>();
   const ledPixelCount = new Map<string, number>();
@@ -57,6 +57,17 @@
       .getGestures()
       .getGestures()
       .find(gesture => gesture.getRecordings().length < StaticConfiguration.minNoOfRecordingsPerGesture);
+  }
+
+  function getIncompleteGestures() {
+    return stores
+      .getGestures()
+      .getGestures()
+      .filter(gesture => gesture.getRecordings().length < StaticConfiguration.minNoOfRecordingsPerGesture);
+  }
+
+  function hasIncompleteGestures() {
+    return getIncompleteGestures().length > 0;
   }
 
   function getRequestedExtraRecordingContext() {
@@ -199,9 +210,10 @@
   }
 
   async function trainModelFromDataPage(ledService: JDService | undefined) {
-    if (modelTrainingInProgress) return;
+    if ($modelTrainingInProgress) return;
 
-    modelTrainingInProgress = true;
+    modelTrainingInProgress.set(true);
+    navigate(Paths.TRAINING);
     const model = stores.getClassifier().getModel();
     const minLedSteps = 8;
     const ledStepDelayMs = 280;
@@ -230,12 +242,12 @@
       await delay(1000);
       await setLedColor(ledService, 0, 0, 0);
     } finally {
-      modelTrainingInProgress = false;
+      modelTrainingInProgress.set(false);
     }
   }
 
   async function runLedAndRecord(buttonService: JDService) {
-    if (modelTrainingInProgress) return;
+    if ($modelTrainingInProgress) return;
 
     const requestedExtraContext = getRequestedExtraRecordingContext();
     const hasRecordingTarget = !!getNextGestureToRecord();
@@ -249,6 +261,18 @@
     // If all current classes are filled and we do not yet have enough data to train,
     // do nothing until the user adds a new class.
     if (!hasRecordingTarget && !requestedExtraContext) {
+      return;
+    }
+
+    // Check if there are multiple incomplete gestures - user should finish the previous one
+    const incompleteGestures = getIncompleteGestures();
+    if (incompleteGestures.length > 1) {
+      const firstIncompleteGesture = incompleteGestures[0];
+      const recordingsCount = firstIncompleteGesture.getRecordings().length;
+      const recordingsNeeded = StaticConfiguration.minNoOfRecordingsPerGesture - recordingsCount;
+      alertUser(
+        `Færdiggør først "${firstIncompleteGesture.getName()}" bevægelse (${recordingsNeeded} flere optagelser) før du kan optage til en ny klasse.`
+      );
       return;
     }
 
@@ -279,7 +303,7 @@
       await delay(recordingDuration + 80);
 
       await setLedColor(ledService, 255, 0, 0);
-      await delay(3000);
+      await delay(650);
       await setLedColor(ledService, 0, 0, 0);
     } catch (e) {
       console.error('Jacdac data trigger failed:', e);
@@ -346,87 +370,3 @@
   });
 </script>
 
-{#if modelTrainingInProgress}
-  <div
-    class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40"
-    style="z-index: 99999; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);">
-    <div class="ai-loading-modal w-[22rem] max-w-[92vw] rounded-2xl bg-white p-6 shadow-2xl">
-      <div class="mx-auto mb-4 h-24 w-24">
-        <div class="ai-loader relative h-full w-full">
-          <span class="ai-ring ai-ring-1" />
-          <span class="ai-ring ai-ring-2" />
-          <span class="ai-ring ai-ring-3" />
-          <span class="ai-core">AI</span>
-        </div>
-      </div>
-      <p class="text-center text-lg font-semibold">Træner model...</p>
-      <p class="mt-2 text-center text-sm text-gray-600">
-        Vent et oejeblik mens modellen lærer dine bevægelser.
-      </p>
-    </div>
-  </div>
-{/if}
-
-<style>
-  .ai-loading-modal {
-    border: 1px solid rgba(196, 208, 227, 0.9);
-  }
-
-  .ai-loader {
-    display: grid;
-    place-items: center;
-  }
-
-  .ai-ring {
-    position: absolute;
-    border-radius: 9999px;
-    border: 3px solid transparent;
-  }
-
-  .ai-ring-1 {
-    width: 100%;
-    height: 100%;
-    border-top-color: #38bdf8;
-    border-right-color: #22d3ee;
-    animation: spin-clockwise 1.15s linear infinite;
-  }
-
-  .ai-ring-2 {
-    width: 72%;
-    height: 72%;
-    border-bottom-color: #6366f1;
-    border-left-color: #818cf8;
-    animation: spin-counter 0.95s linear infinite;
-  }
-
-  .ai-ring-3 {
-    width: 44%;
-    height: 44%;
-    border-top-color: #06b6d4;
-    border-left-color: #0ea5e9;
-    animation: spin-clockwise 0.75s linear infinite;
-  }
-
-  .ai-core {
-    font-size: 0.9rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: #0f172a;
-    background: linear-gradient(120deg, #38bdf8, #6366f1);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  @keyframes spin-clockwise {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @keyframes spin-counter {
-    to {
-      transform: rotate(-360deg);
-    }
-  }
-</style>

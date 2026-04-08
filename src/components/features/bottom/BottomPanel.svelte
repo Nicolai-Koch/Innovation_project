@@ -15,7 +15,6 @@
   import View3DLive from '../3d-inspector/View3DLive.svelte';
   import BaseDialog from '../../ui/dialogs/BaseDialog.svelte';
   import MicrobitLiveGraph from '../graphs/MicrobitLiveGraph.svelte';
-  import StandardButton from '../../ui/buttons/StandardButton.svelte';
   import { stores } from '../../../lib/stores/Stores';
   import JacdacConnectButton from '../../../lib/jacdac/ConnectButton.svelte';
   import { currentPath, Paths } from '../../../router/Router';
@@ -51,9 +50,12 @@
     <!-- No input microbit assigned -->
     <div class="h-full w-full flex justify-center items-center bg-white">
       <div class="flex flex-row items-center gap-3">
-        <StandardButton onClick={connectButtonClicked}>
-          {$tr('footer.connectButtonNotConnected')}
-        </StandardButton>
+        <button
+          type="button"
+          class="inline-flex items-center rounded-lg border border-teal-500 bg-white px-3 py-1.5 text-xs font-semibold text-teal-700 shadow-sm hover:bg-teal-50 transition-colors"
+          on:click={connectButtonClicked}>
+          Tilslut micro:bit
+        </button>
         <JacdacConnectButton compact={true} />
       </div>
     </div>

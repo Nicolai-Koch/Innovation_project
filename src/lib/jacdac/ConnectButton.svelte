@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { connected, error, initializeBus, connectToBus, disconnectFromBus } from './stores';
-  import StandardButton from '../../components/ui/buttons/StandardButton.svelte';
 
   export let compact = false;
 
@@ -46,15 +45,17 @@
 
 <div class="connect-button-container">
   {#key $connected}
-    <StandardButton
-      small={compact}
-      medium={!compact}
-      color={$connected ? 'warning' : 'secondary'}
-      outlined={true}
-      onClick={handleClick}
+    <button
+      type="button"
+      class="inline-flex items-center font-semibold transition-colors"
+      class:connected={$connected}
+      class:disconnected={!$connected}
+      class:compact={compact}
+      class:regular={!compact}
+      on:click={handleClick}
     >
-      {$connected ? 'Frakobl Jacdac' : 'Connect Jacdac'}
-    </StandardButton>
+      {$connected ? 'Frakobl Jacdac' : 'Tilslut Jacdac'}
+    </button>
   {/key}
 
   {#if errorMessage && !compact}
@@ -82,6 +83,42 @@
     flex-direction: column;
     gap: 0.5rem;
     margin: 0;
+  }
+
+  button.disconnected {
+    border: 1px solid #14b8a6;
+    background: white;
+    color: #0f766e;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+
+  button.disconnected:hover {
+    background: #f0fdfa;
+  }
+
+  button.connected {
+    border: 1px solid #f59e0b;
+    background: white;
+    color: #b45309;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+
+  button.connected:hover {
+    background: #fffbeb;
+  }
+
+  button.compact {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  button.regular {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 
   .status-message {

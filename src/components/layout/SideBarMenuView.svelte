@@ -10,7 +10,6 @@
   import type { MenuProperties } from '../sidemenu/Menus';
   import { currentPath, navigate, Paths } from '../../router/Router';
   import MediaQuery from './MediaQuery.svelte';
-  import { Feature, getFeature } from '../../lib/FeatureToggles';
   import Menus from '../sidemenu/Menus';
   import MenuButton from '../sidemenu/MenuButton.svelte';
   import { isLoading } from '../../lib/stores/ApplicationState';
@@ -41,7 +40,7 @@
         class="text-secondarytext font-extrabold self-center"
         class:text-3xl={!isSmall}
         class:text-2xl={isSmall}>
-        {getFeature(Feature.TITLE)}
+        AI Træning
       </p>
       <div class="text-white self-center ml-4 focus:outline-none">
         <button
@@ -71,6 +70,9 @@
           title={menu.title}
           helpTitle={menu.infoBubbleTitle}
           helpDescription={menu.infoBubbleContent}
+          showInfo={menu.showInfo ?? true}
+          underlineTitle={menu.underlineTitle ?? true}
+          disabled={menu.disabled ?? false}
           isExpanded={shouldBeExpanded(menu)}>
           <svelte:component
             this={shouldBeExpanded(menu)
