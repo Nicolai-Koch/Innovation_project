@@ -146,7 +146,7 @@
   "menu.model.helpHeading": "Test Robot",
   "menu.model.helpBody": "Her proever robotten at gaette din bevaegelse.",
   "menu.model.noModel": "AI trænes ...",
-  "menu.model.connectOutputButton": "Tilslut output-micro:bit",
+  "menu.model.connectOutputButton": "Tilslut anden micro:bit",
   "menu.model.disconnect": "Frakobl output-micro:bit",
   "menu.model.connectInputMicrobit": "Tilkobl micro:bit",
   "menu.validate.helpHeading": "Validér",

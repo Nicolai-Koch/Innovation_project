@@ -146,7 +146,7 @@
   "menu.model.helpHeading": "Modell",
   "menu.model.helpBody": "Das Modell kann in einem interaktiven System verwendet werden. Hier verwenden wir das trainierte Modell, um Gesten vorherzusagen. Man kann einen anderen micro:bit anschließen und ihn dazu bringen, auf die vorhergesagten Gesten zu reagieren.",
   "menu.model.noModel": "Kein Modell",
-  "menu.model.connectOutputButton": "Ausgabe-micro:bit verbinden",
+  "menu.model.connectOutputButton": "Zweiten micro:bit verbinden",
   "menu.model.disconnect": "Eingabe-micro:bit verbinden",
   "menu.model.connectInputMicrobit": "micro:bit verbinden",
   "menu.validate.helpHeading": "Validieren",

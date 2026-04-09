@@ -8,6 +8,7 @@
   import { onMount } from 'svelte';
   import { currentPath, navigate, Paths, type PathType } from './Router';
   import { currentPageComponent } from '../components/layout/currentComponentStore';
+  import { resetGameSession } from '../lib/stores/TeamGameStore';
 
   async function getRoutedComponent(path: PathType) {
     switch (path) {
@@ -64,6 +65,7 @@
 
   const navigateFromUrl = () => {
     // Always start from home after a full page reload.
+    resetGameSession();
     navigate(Paths.HOME);
     history.replaceState({ path: Paths.HOME }, '', Paths.HOME);
   };

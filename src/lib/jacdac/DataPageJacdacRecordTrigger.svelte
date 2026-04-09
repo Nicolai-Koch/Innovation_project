@@ -24,6 +24,7 @@
   import { trainKNNModel, trainNNModel } from '../../pages/training/TrainingPage.ts';
   import ModelRegistry from '../domain/ModelRegistry';
   import { modelTrainingInProgress } from '../stores/ApplicationState';
+  import { classesPerRound, jacdacGameMode } from '../stores/TeamGameStore';
 
   let knownDevices: JDDevice[] = [];
   let triggerInProgress = false;
@@ -97,8 +98,11 @@
 
   function hasEnoughDataToTrain() {
     const gestures = stores.getGestures().getGestures();
+    const requiredGestureCount = $jacdacGameMode
+      ? $classesPerRound
+      : StaticConfiguration.minNoOfGestures;
     return (
-      gestures.length >= StaticConfiguration.minNoOfGestures &&
+      gestures.length >= requiredGestureCount &&
       gestures.every(
         gesture =>
           gesture.getRecordings().length >= StaticConfiguration.minNoOfRecordingsPerGesture,

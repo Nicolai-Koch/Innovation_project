@@ -5,6 +5,7 @@
   import { devices as jacdacDevices, connected } from './stores';
   import { stores } from '../stores/Stores';
   import ButtonMonitor from './ButtonMonitor.svelte';
+  import RotaryMonitor from './RotaryMonitor.svelte';
   import LedRing from './LedRing.svelte';
   import LightSensorLedAutomation from './LightSensorLedAutomation.svelte';
   import MagnetSensorLedAutomation from './MagnetSensorLedAutomation.svelte';
@@ -56,6 +57,8 @@
 </button>
 
 <BaseDialog isOpen={isOpen} onClose={() => (isOpen = false)}>
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="tools-dialog" on:click|stopPropagation>
     <div class="tools-header">
       <h2>Jacdac module tests</h2>
@@ -71,14 +74,14 @@
           </StandardButton>
         {:else if !$devices.isOutputAssigned}
           <StandardButton onClick={startConnectionProcess}>
-            Tilslut output-micro:bit
+            Tilslut hold B micro:bit
           </StandardButton>
         {:else}
           <StandardButton onClick={() => Microbits.disconnectInput()} color="warning">
             Frakobl input-micro:bit
           </StandardButton>
           <StandardButton onClick={() => Microbits.disconnectOutput()} color="warning">
-            Frakobl output-micro:bit
+            Frakobl hold B micro:bit
           </StandardButton>
         {/if}
       </div>
@@ -92,6 +95,11 @@
       <section class="section">
         <h3>Buttons</h3>
         <ButtonMonitor />
+      </section>
+
+      <section class="section">
+        <h3>Rotary inputs</h3>
+        <RotaryMonitor />
       </section>
 
       <section class="section">

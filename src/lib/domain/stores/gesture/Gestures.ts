@@ -17,6 +17,7 @@ import StaticConfiguration from '../../../../StaticConfiguration';
 import type { GestureRepository } from '../../GestureRepository';
 import type { RecordingData } from '../../RecordingData';
 import Logger from '../../../utils/Logger';
+import { classesPerRound, jacdacGameMode } from '../../../stores/TeamGameStore';
 
 export type PersistedGestureData = {
   name: string;
@@ -52,7 +53,11 @@ class Gestures implements Readable<GestureData[]> {
   }
 
   public hasSufficientData(): boolean {
-    if (get(Gestures.subscribableGestures).length < StaticConfiguration.minNoOfGestures) {
+    const requiredGestureCount = get(jacdacGameMode)
+      ? get(classesPerRound)
+      : StaticConfiguration.minNoOfGestures;
+
+    if (get(Gestures.subscribableGestures).length < requiredGestureCount) {
       return false;
     }
     const recordingsCount = get(Gestures.subscribableGestures).map(

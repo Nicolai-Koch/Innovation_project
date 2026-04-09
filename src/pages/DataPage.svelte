@@ -10,9 +10,17 @@
   import DataPageNoData from './data/DataPageNoData.svelte';
   import DataPageWithData from './data/DataPageWithData.svelte';
   import DataPageJacdacRecordTrigger from '../lib/jacdac/DataPageJacdacRecordTrigger.svelte';
+  import { activeTeam, classesPerRound, jacdacGameMode } from '../lib/stores/TeamGameStore';
 
   const gestures = stores.getGestures();
   const devices = stores.getDevices();
+
+  $: if ($jacdacGameMode) {
+    const existing = gestures.getGestures();
+    for (let idx = existing.length; idx < $classesPerRound; idx++) {
+      gestures.createGesture((idx + 1).toString());
+    }
+  }
 </script>
 
 <!-- Main pane -->
@@ -25,13 +33,20 @@
         <p class="text-2xl font-bold">Træn din egen AI!</p>
         {#if !$gestures.length}
           <div class="text-left text-base mt-2 max-w-2xl mx-auto">
-            <p class="font-semibold">På denne side kan du:</p>
-            <p>1. trykke på + for at tilføje din helt egen data til AI</p>
-            <p>2. navngiv din bevægelse</p>
-            <p>
-              3. tag din microbit i hånden og begynd at optage den bevægelse du har valgt. Her
-              skal du bare trykke på knappen på din Jacdac
-            </p>
+            {#if $jacdacGameMode}
+              <p class="font-semibold">På denne side kan du:</p>
+              <p>1. optage bevægelse til klasse 1, 2, 3 osv. for hold {$activeTeam}</p>
+              <p>2. trykke på Jacdac-knappen for at optage</p>
+              <p>3. lade systemet skifte automatisk til næste klasse efter 3 optagelser</p>
+            {:else}
+              <p class="font-semibold">På denne side kan du:</p>
+              <p>1. trykke på + for at tilføje din helt egen data til AI</p>
+              <p>2. navngiv din bevægelse</p>
+              <p>
+                3. tag din microbit i hånden og begynd at optage den bevægelse du har valgt.
+                Her skal du bare trykke på knappen på din Jacdac
+              </p>
+            {/if}
           </div>
         {/if}
       </div>

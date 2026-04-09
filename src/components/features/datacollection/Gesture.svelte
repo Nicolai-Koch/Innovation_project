@@ -25,6 +25,7 @@
   import GestureDot from '../../ui/GestureDot.svelte';
   import { Feature, getFeature } from '../../../lib/FeatureToggles';
   import { requestedExtraRecordingRequest } from '../../../lib/stores/ExtraRecordingStore';
+  import { jacdacGameMode } from '../../../lib/stores/TeamGameStore';
 
   export let onNoMicrobitSelect: () => void;
   export let gesture: Gesture;
@@ -77,6 +78,10 @@
 
   // When title is clicked. Remove name
   function titleClicked(): void {
+    if ($jacdacGameMode) {
+      return;
+    }
+
     if (gesture.getName() === defaultNewName) {
       gesture.setName('');
     }
@@ -226,13 +231,17 @@
       </div>
       <div class="flex items-center justify-center relative p-2 w-50 h-30">
         <div class="w-40 text-center font-semibold transition ease rounded-xl border border-gray-300 border-solid hover:bg-gray-100 relative">
-          <h3
-            contenteditable
-            bind:innerText={$nameBind}
-            on:click={titleClicked}
-            on:keypress={onTitleKeypress} />
+          {#if $jacdacGameMode}
+            <h3 class="py-1">{$nameBind}</h3>
+          {:else}
+            <h3
+              contenteditable
+              bind:innerText={$nameBind}
+              on:click={titleClicked}
+              on:keypress={onTitleKeypress}>{$nameBind}</h3>
+          {/if}
           
-          {#if showDropdown}
+          {#if showDropdown && !$jacdacGameMode}
             <div class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 max-h-64 overflow-y-auto">
               {#each predefinedGestures as predefined (predefined.name)}
                 <button
@@ -246,11 +255,11 @@
             </div>
           {/if}
         </div>
-        <button class="absolute right-2 top-2 outline-none">
-          <i
-            class="far fa-times-circle fa-lg text-light-800 hover:text-black transition ease"
-            on:click={removeClicked} />
-        </button>
+        {#if !$jacdacGameMode}
+          <button class="absolute right-2 top-2 outline-none" type="button" on:click={removeClicked}>
+            <i class="far fa-times-circle fa-lg text-light-800 hover:text-black transition ease" />
+          </button>
+        {/if}
       </div>
     </GestureCard>
 

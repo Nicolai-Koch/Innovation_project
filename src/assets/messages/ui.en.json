@@ -146,7 +146,7 @@
   "menu.model.helpHeading": "Test robot",
   "menu.model.helpBody": "Here your robot tries to guess your movement.",
   "menu.model.noModel": "Robot not ready",
-  "menu.model.connectOutputButton": "Connect output micro:bit",
+  "menu.model.connectOutputButton": "Connect second micro:bit",
   "menu.model.disconnect": "Disconnect output micro:bit",
   "menu.model.connectInputMicrobit": "Connect micro:bit",
   "menu.validate.helpHeading": "Validate",
