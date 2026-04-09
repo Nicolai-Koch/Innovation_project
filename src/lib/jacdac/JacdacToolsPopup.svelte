@@ -3,10 +3,16 @@
   import type { JDService } from 'jacdac-ts';
   import BaseDialog from '../../components/ui/dialogs/BaseDialog.svelte';
   import { devices as jacdacDevices, connected } from './stores';
+  import { stores } from '../stores/Stores';
   import ButtonMonitor from './ButtonMonitor.svelte';
   import LedRing from './LedRing.svelte';
   import LightSensorLedAutomation from './LightSensorLedAutomation.svelte';
   import MagnetSensorLedAutomation from './MagnetSensorLedAutomation.svelte';
+  import StandardButton from '../../components/ui/buttons/StandardButton.svelte';
+  import { startConnectionProcess } from '../stores/connectDialogStore';
+  import Microbits from '../microbit-interfacing/Microbits';
+
+  const devices = stores.getDevices();
 
   let isOpen = false;
   export let iconOnly = false;
@@ -55,6 +61,28 @@
       <h2>Jacdac module tests</h2>
       <button class="close-button" on:click={() => (isOpen = false)}>Close</button>
     </div>
+
+    <section class="section connection-section">
+      <h3>Forbindelser</h3>
+      <div class="connection-grid">
+        {#if !$connected}
+          <StandardButton onClick={startConnectionProcess}>
+            Tilslut micro:bit
+          </StandardButton>
+        {:else if !$devices.isOutputAssigned}
+          <StandardButton onClick={startConnectionProcess}>
+            Tilslut output-micro:bit
+          </StandardButton>
+        {:else}
+          <StandardButton onClick={() => Microbits.disconnectInput()} color="warning">
+            Frakobl input-micro:bit
+          </StandardButton>
+          <StandardButton onClick={() => Microbits.disconnectOutput()} color="warning">
+            Frakobl output-micro:bit
+          </StandardButton>
+        {/if}
+      </div>
+    </section>
 
     <p class="status" class:online={$connected}>
       {$connected ? 'Bus connected' : 'Bus disconnected'}
@@ -204,6 +232,16 @@
     border: 1px solid #dde5ef;
     border-radius: 8px;
     padding: 0.8rem;
+  }
+
+  .connection-section {
+    margin-bottom: 1rem;
+  }
+
+  .connection-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
   }
 
   h3 {

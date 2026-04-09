@@ -12,10 +12,15 @@
   <div class="flex h-full w-full items-center justify-center bg-transparent">
     <div class="ai-loading-modal w-[22rem] max-w-[92vw] rounded-2xl bg-white p-6 shadow-2xl">
       <div class="mx-auto mb-4 h-24 w-24">
-        <div class="ai-loader relative h-full w-full">
-          <span class="ai-ring ai-ring-1" />
-          <span class="ai-ring ai-ring-2" />
-          <span class="ai-ring ai-ring-3" />
+        <div class="ai-loader relative h-full w-full" aria-label="AI training LED ring animation">
+          <span class="ai-led led-1" />
+          <span class="ai-led led-2" />
+          <span class="ai-led led-3" />
+          <span class="ai-led led-4" />
+          <span class="ai-led led-5" />
+          <span class="ai-led led-6" />
+          <span class="ai-led led-7" />
+          <span class="ai-led led-8" />
           <span class="ai-core">AI</span>
         </div>
       </div>
@@ -34,35 +39,25 @@
     place-items: center;
   }
 
-  .ai-ring {
+  .ai-led {
     position: absolute;
     border-radius: 9999px;
-    border: 3px solid transparent;
+    width: 0.85rem;
+    height: 0.85rem;
+    --led-transform: translate(0, 0);
+    background: rgba(15, 23, 42, 0.18);
+    box-shadow: 0 0 0 rgba(34, 211, 238, 0);
+    animation: led-chase 2.24s linear infinite;
   }
 
-  .ai-ring-1 {
-    width: 100%;
-    height: 100%;
-    border-top-color: #38bdf8;
-    border-right-color: #22d3ee;
-    animation: spin-clockwise 1.15s linear infinite;
-  }
-
-  .ai-ring-2 {
-    width: 72%;
-    height: 72%;
-    border-bottom-color: #6366f1;
-    border-left-color: #818cf8;
-    animation: spin-counter 0.95s linear infinite;
-  }
-
-  .ai-ring-3 {
-    width: 44%;
-    height: 44%;
-    border-top-color: #06b6d4;
-    border-left-color: #0ea5e9;
-    animation: spin-clockwise 0.75s linear infinite;
-  }
+  .led-1 { top: 0.2rem; left: 50%; --led-transform: translate(-50%, 0); animation-delay: 0s; }
+  .led-2 { top: 1.1rem; right: 1.1rem; animation-delay: -0.28s; }
+  .led-3 { top: 50%; right: 0.2rem; --led-transform: translate(0, -50%); animation-delay: -0.56s; }
+  .led-4 { bottom: 1.1rem; right: 1.1rem; animation-delay: -0.84s; }
+  .led-5 { bottom: 0.2rem; left: 50%; --led-transform: translate(-50%, 0); animation-delay: -1.12s; }
+  .led-6 { bottom: 1.1rem; left: 1.1rem; animation-delay: -1.4s; }
+  .led-7 { top: 50%; left: 0.2rem; --led-transform: translate(0, -50%); animation-delay: -1.68s; }
+  .led-8 { top: 1.1rem; left: 1.1rem; animation-delay: -1.96s; }
 
   .ai-core {
     font-size: 0.9rem;
@@ -75,15 +70,21 @@
     -webkit-text-fill-color: transparent;
   }
 
-  @keyframes spin-clockwise {
-    to {
-      transform: rotate(360deg);
+  @keyframes led-chase {
+    0%, 9% {
+      background: rgba(15, 23, 42, 0.18);
+      box-shadow: 0 0 0 rgba(34, 211, 238, 0);
+      transform: var(--led-transform) scale(1);
     }
-  }
-
-  @keyframes spin-counter {
-    to {
-      transform: rotate(-360deg);
+    10%, 24% {
+      background: rgb(34, 211, 238);
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
+      transform: var(--led-transform) scale(1.15);
+    }
+    25%, 100% {
+      background: rgba(15, 23, 42, 0.18);
+      box-shadow: 0 0 0 rgba(34, 211, 238, 0);
+      transform: var(--led-transform) scale(1);
     }
   }
 </style>

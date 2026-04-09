@@ -29,6 +29,8 @@
   const onLoad = () => {
     $isLoading = false;
   };
+
+  const sideMenuNavigationDisabled = true;
 </script>
 
 <div
@@ -65,14 +67,16 @@
         <MenuButton
           tooltipOffset={menu.tooltipOffset}
           onClickFunction={() => {
-            navigate(menu.navigationPath);
+            if (!sideMenuNavigationDisabled && !(menu.disabled ?? false)) {
+              navigate(menu.navigationPath);
+            }
           }}
           title={menu.title}
           helpTitle={menu.infoBubbleTitle}
           helpDescription={menu.infoBubbleContent}
           showInfo={menu.showInfo ?? true}
           underlineTitle={menu.underlineTitle ?? true}
-          disabled={menu.disabled ?? false}
+          disabled={sideMenuNavigationDisabled || (menu.disabled ?? false)}
           isExpanded={shouldBeExpanded(menu)}>
           <svelte:component
             this={shouldBeExpanded(menu)

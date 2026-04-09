@@ -6,12 +6,10 @@
 
 <script lang="ts">
   import { fade } from 'svelte/transition';
-  import ConnectedLiveGraphButtons from './ConnectedLiveGraphButtons.svelte';
   import LiveGraphInformationSection from './LiveGraphInformationSection.svelte';
   import { tr } from '../../../i18n';
   import ConnectDialogContainer from '../../features/connection-prompt/ConnectDialogContainer.svelte';
   import { startConnectionProcess } from '../../../lib/stores/connectDialogStore';
-  import Microbits from '../../../lib/microbit-interfacing/Microbits';
   import View3DLive from '../3d-inspector/View3DLive.svelte';
   import BaseDialog from '../../ui/dialogs/BaseDialog.svelte';
   import MicrobitLiveGraph from '../graphs/MicrobitLiveGraph.svelte';
@@ -26,14 +24,6 @@
 
   const connectButtonClicked = () => {
     startConnectionProcess();
-  };
-
-  const inputDisconnectButtonClicked = () => {
-    Microbits.disconnectInputAndOutput();
-  };
-
-  const outputDisconnectButtonClicked = () => {
-    Microbits.disconnectOutput();
   };
 
   let isLive3DOpen = false;
@@ -82,11 +72,6 @@
         <div class="absolute right-4 bottom-2 m-0 float-right z-10">
           <div class="flex flex-row items-center gap-2">
             <JacdacConnectButton compact={true} />
-            <ConnectedLiveGraphButtons
-              showOutputControls={$currentPath === Paths.MODEL}
-              onInputDisconnectButtonClicked={inputDisconnectButtonClicked}
-              onOutputConnectButtonClicked={connectButtonClicked}
-              onOutputDisconnectButtonClicked={outputDisconnectButtonClicked} />
           </div>
         </div>
       </div>

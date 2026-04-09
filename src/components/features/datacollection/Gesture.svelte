@@ -24,6 +24,7 @@
   import { startRecording } from '../../../lib/utils/Recording';
   import GestureDot from '../../ui/GestureDot.svelte';
   import { Feature, getFeature } from '../../../lib/FeatureToggles';
+  import { requestedExtraRecordingRequest } from '../../../lib/stores/ExtraRecordingStore';
 
   export let onNoMicrobitSelect: () => void;
   export let gesture: Gesture;
@@ -48,6 +49,11 @@
 
   const nameBind = gesture.bindName();
   const minRecordingsRequired = StaticConfiguration.minNoOfRecordingsPerGesture;
+  $: targetRecordingsRequired =
+    $requestedExtraRecordingRequest?.gestureId === $gesture.ID
+      ? Math.max(minRecordingsRequired, $requestedExtraRecordingRequest.targetRecordings)
+      : minRecordingsRequired;
+  $: isGestureReadyForTraining = $gesture.recordings.length >= targetRecordingsRequired;
 
   const fallbackRowBackgroundColor = 'rgba(240, 240, 240, 0.85)';
 
@@ -251,7 +257,7 @@
     <GestureCard small mr elevated={$chosenGesture === gesture}>
       <div class="text-center w-35">
         <div class="h-30 w-full flex flex-col items-center justify-center px-3 gap-2">
-          {#if $gesture.recordings.length >= minRecordingsRequired}
+          {#if isGestureReadyForTraining}
             <p class="text-center text-sm leading-tight font-semibold text-green-600 flex items-center gap-1">
               Klar til træning
               <i class="fas fa-check text-green-600" />

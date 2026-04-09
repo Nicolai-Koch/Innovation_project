@@ -158,18 +158,18 @@
     await service.register(LedReg.Pixels).sendSetPackedAsync([pixels], true);
   }
 
-  async function setProgressLeds(service: JDService | undefined, litCount: number) {
+  async function setProgressLeds(service: JDService | undefined, activeLedIndex: number) {
     if (!service) return;
 
     const count = await getLedPixelCount(service);
     if (!count) return;
 
     const activeLeds = Math.min(count, 8);
-    const safeLitCount = Math.max(0, Math.min(litCount, activeLeds));
+    const safeLedIndex = ((activeLedIndex % activeLeds) + activeLeds) % activeLeds;
     const pixels = new Uint8Array(count * 3);
 
     for (let i = 0; i < count; i++) {
-      const isLit = i < safeLitCount;
+      const isLit = i === safeLedIndex;
       pixels[i * 3] = isLit ? 0 : 0;
       pixels[i * 3 + 1] = isLit ? 180 : 0;
       pixels[i * 3 + 2] = isLit ? 255 : 0;
@@ -214,23 +214,24 @@
 
     modelTrainingInProgress.set(true);
     navigate(Paths.TRAINING);
-    const model = stores.getClassifier().getModel();
-    const minLedSteps = 8;
     const ledStepDelayMs = 280;
 
     try {
       const trainingPromise = get(stores.getSelectedModel()).id === ModelRegistry.KNN.id
         ? trainKNNModel()
         : trainNNModel();
+      let trainingDone = false;
 
-      for (let step = 1; step <= minLedSteps; step++) {
-        await setProgressLeds(ledService, step);
+      void trainingPromise.finally(() => {
+        trainingDone = true;
+      });
+
+      let activeLedIndex = 0;
+
+      while (!trainingDone) {
+        await setProgressLeds(ledService, activeLedIndex);
+        activeLedIndex = (activeLedIndex + 1) % 8;
         await delay(ledStepDelayMs);
-      }
-
-      while (model.isTraining()) {
-        await setProgressLeds(ledService, minLedSteps);
-        await delay(160);
       }
 
       await trainingPromise;

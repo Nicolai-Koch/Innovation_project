@@ -15,6 +15,7 @@
 </style>
 
 <script lang="ts">
+  import { get } from 'svelte/store';
   import { t } from '../../../i18n';
   import type { SoundData } from '../../../lib/domain/stores/gesture/Gesture';
   import type Gesture from '../../../lib/domain/stores/gesture/Gesture';
@@ -23,7 +24,10 @@
   import { stores } from '../../../lib/stores/Stores';
   import { chosenGesture } from '../../../lib/stores/uiStore';
   import StaticConfiguration from '../../../StaticConfiguration';
-  import { requestExtraRecordingForGesture } from '../../../lib/stores/ExtraRecordingStore';
+  import {
+    requestExtraRecordingForGesture,
+    requestedExtraRecordingRequest,
+  } from '../../../lib/stores/ExtraRecordingStore';
   import Card from '../../ui/Card.svelte';
   import GestureDot from '../../ui/GestureDot.svelte';
   import Information from '../../ui/information/Information.svelte';
@@ -185,7 +189,13 @@
   };
 
   const addExtraRecording = () => {
-    requestExtraRecordingForGesture(gesture.getId(), gesture.getRecordings().length + 1);
+    const request = get(requestedExtraRecordingRequest);
+    const currentTarget =
+      request?.gestureId === gesture.getId()
+        ? Math.max(request.targetRecordings, gesture.getRecordings().length)
+        : gesture.getRecordings().length;
+
+    requestExtraRecordingForGesture(gesture.getId(), currentTarget + 1);
     chosenGesture.set(gesture);
     navigate(Paths.DATA);
   };

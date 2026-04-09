@@ -7,49 +7,23 @@
 <script lang="ts">
   import { tr } from '../../../i18n';
   import { stores } from '../../../lib/stores/Stores';
-  import TypingUtils from '../../../lib/TypingUtils';
   import StandardButton from '../../ui/buttons/StandardButton.svelte';
+
   const devices = stores.getDevices();
 
-  export let onOutputDisconnectButtonClicked: () => void;
   export let onOutputConnectButtonClicked: () => void;
-  export let onInputDisconnectButtonClicked: () => void;
   export let showOutputControls = true;
 
   const model = stores.getClassifier().getModel();
 </script>
 
-<!-- These are the buttons that are present while the input micro:bit is connected-->
+<!-- Keep the live graph controls minimal; disconnect lives in the settings popup. -->
 <div class="flex flex-row mr-4">
   {#if showOutputControls && ($model.hasModel || $model.isTraining || $devices.isOutputConnected)}
-    {#if $devices.isOutputAssigned}
-      <!-- Output is assigned -->
-      {#if !$devices.isOutputConnected || $devices.isOutputReady}
-        <!-- Output MB is not in the connection process -->
-        <StandardButton medium onClick={onOutputDisconnectButtonClicked} color="warning">
-          {$tr('menu.model.disconnect')}
-        </StandardButton>
-      {:else}
-        <!-- svelte-ignore missing-declaration -->
-        <StandardButton medium onClick={TypingUtils.emptyFunction} color="disabled">
-          <img alt="loading" src="imgs/loadingspinner.gif" style="height:24px" />
-        </StandardButton>
-      {/if}
-    {:else}
+    {#if !$devices.isOutputAssigned}
       <StandardButton medium onClick={onOutputConnectButtonClicked}>
         {$tr('menu.model.connectOutputButton')}
       </StandardButton>
     {/if}
   {/if}
-  <div class="ml-2">
-    {#if !$devices.isInputConnected || $devices.isInputReady}
-      <!-- Input MB is not in the connection process -->
-      <StandardButton medium onClick={onInputDisconnectButtonClicked} color="warning"
-        >{$tr('footer.disconnectButton')}</StandardButton>
-    {:else}
-      <StandardButton medium onClick={TypingUtils.emptyFunction} color="disabled">
-        <img alt="loading" src="/imgs/loadingspinner.gif" style="height:24px" />
-      </StandardButton>
-    {/if}
-  </div>
 </div>
