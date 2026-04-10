@@ -7,17 +7,13 @@ import { MBSpecs, type MicrobitHandler } from 'microbyte';
 import Logger from '../utils/Logger';
 import { buttonPressed, onCatastrophicError } from '../stores/uiStore';
 import TypingUtils from '../TypingUtils';
-import { get } from 'svelte/store';
-import MicrobitAccelerometerLiveData, {
-  MicrobitAccelerometerDataVector,
-} from '../livedata/MicrobitAccelerometerData';
-import LiveDataBuffer from '../domain/LiveDataBuffer';
 import StaticConfiguration from '../../StaticConfiguration';
 import Microbits from './Microbits';
 import { HexOrigin } from './HexOrigin';
 import { stores } from '../stores/Stores';
 import Devices, { DeviceRequestStates } from '../domain/Devices';
 import { ModelView, modelView } from '../stores/ApplicationState';
+import { getTeamLiveDataSource, pushTeamLiveSample } from '../stores/TeamGameStore';
 
 class InputMicrobitHandler implements MicrobitHandler {
   private reconnectTimeout = setTimeout(TypingUtils.emptyFunction, 0);
@@ -29,10 +25,7 @@ class InputMicrobitHandler implements MicrobitHandler {
     Logger.log('InputMicrobitHandler', 'onConnected', versionNumber);
 
     clearTimeout(this.reconnectTimeout);
-    const buffer = new LiveDataBuffer<MicrobitAccelerometerDataVector>(
-      StaticConfiguration.accelerometerLiveDataBufferSize,
-    );
-    stores.setLiveData(new MicrobitAccelerometerLiveData(buffer));
+    stores.setLiveData(getTeamLiveDataSource('A'));
 
     this.devices.update(s => {
       s.isInputConnected = true;
@@ -52,17 +45,7 @@ class InputMicrobitHandler implements MicrobitHandler {
     const accelX = x / 1000.0;
     const accelY = y / 1000.0;
     const accelZ = z / 1000.0;
-
-    const liveDataStore = get(stores).liveData;
-    if (liveDataStore !== undefined) {
-      liveDataStore.put(
-        new MicrobitAccelerometerDataVector({
-          x: accelX,
-          y: accelY,
-          z: accelZ,
-        }),
-      );
-    }
+    pushTeamLiveSample('A', accelX, accelY, accelZ);
   }
 
   public onInitializing(): void {

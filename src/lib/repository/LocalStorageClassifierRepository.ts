@@ -18,13 +18,15 @@ import type { TrainingDataRepository } from '../domain/TrainingDataRepository';
 import { t } from '../../i18n';
 import type { FiltersRepository } from '../domain/FiltersRepository';
 import type Snackbar from '../stores/Snackbar';
+import { activeTeam, modelTrainingTeam, type TeamKey } from '../stores/TeamGameStore';
 
 export type TrainerConsumer = <T extends MLModel>(
   trainer: ModelTrainer<T>,
 ) => Promise<void>;
 
 class LocalStorageClassifierRepository implements ClassifierRepository {
-  private static mlModel: Writable<MLModel | undefined>;
+  private static activeTeamModel: Writable<MLModel | undefined>;
+  private static teamModels: Record<TeamKey, Writable<MLModel | undefined>>;
   private classifierFactory: ClassifierFactory;
 
   constructor(
@@ -33,7 +35,11 @@ class LocalStorageClassifierRepository implements ClassifierRepository {
     private snackbar: Snackbar,
     private filtersRepository: FiltersRepository,
   ) {
-    LocalStorageClassifierRepository.mlModel = writable(undefined);
+    LocalStorageClassifierRepository.teamModels = {
+      A: writable(undefined),
+      B: writable(undefined),
+    };
+    LocalStorageClassifierRepository.activeTeamModel = this.createActiveModelStore();
     this.classifierFactory = new ClassifierFactory();
   }
 
@@ -42,7 +48,7 @@ class LocalStorageClassifierRepository implements ClassifierRepository {
       LocalStorageRepositories.getInstance().getGestureRepository();
     // TODO: We should cache this object, as it can function as a singleton. This would improve performance
     const classifier = this.classifierFactory.buildClassifier(
-      LocalStorageClassifierRepository.mlModel,
+      LocalStorageClassifierRepository.activeTeamModel,
       this.getTrainerConsumer(),
       this.filtersRepository.getFilters(),
       gestureRepository,
@@ -62,7 +68,8 @@ class LocalStorageClassifierRepository implements ClassifierRepository {
   private async trainModel<T extends MLModel>(trainer: ModelTrainer<T>): Promise<void> {
     const model = await trainer.trainModel(this.trainingDataRepository);
     this.snackbar.sendMessage(get(t)('snackbar.modeltrained'));
-    LocalStorageClassifierRepository.mlModel.set(model);
+    const targetTeam = get(modelTrainingTeam) ?? get(activeTeam);
+    LocalStorageClassifierRepository.teamModels[targetTeam].set(model);
   }
 
   private getTrainerConsumer(): TrainerConsumer {
@@ -97,6 +104,26 @@ class LocalStorageClassifierRepository implements ClassifierRepository {
 
   public getConfidences(): Confidences {
     return this.confidences;
+  }
+
+  private createActiveModelStore(): Writable<MLModel | undefined> {
+    const activeModel = derived(
+      [activeTeam, LocalStorageClassifierRepository.teamModels.A, LocalStorageClassifierRepository.teamModels.B],
+      ([team, modelA, modelB]) => (team === 'A' ? modelA : modelB),
+    );
+
+    return {
+      subscribe: activeModel.subscribe,
+      set: value => {
+        const targetTeam = get(modelTrainingTeam) ?? get(activeTeam);
+        LocalStorageClassifierRepository.teamModels[targetTeam].set(value);
+      },
+      update: updater => {
+        const currentTeam = get(modelTrainingTeam) ?? get(activeTeam);
+        const currentModel = get(LocalStorageClassifierRepository.teamModels[currentTeam]);
+        LocalStorageClassifierRepository.teamModels[currentTeam].set(updater(currentModel));
+      },
+    };
   }
 }
 

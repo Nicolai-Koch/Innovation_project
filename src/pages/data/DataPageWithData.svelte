@@ -16,6 +16,9 @@
   import ConnectDialogContainer from '../../components/features/connection-prompt/ConnectDialogContainer.svelte';
   import StaticConfiguration from '../../StaticConfiguration';
   import { requestedExtraRecordingRequest } from '../../lib/stores/ExtraRecordingStore';
+  import { simulateRecordingForActiveTeam } from './DataPage';
+  import { adminTestMode } from '../../lib/stores/TeamGameStore';
+  import { trainBothTeamModels } from '../training/TrainingPage';
   import {
     areBothTeamsTrainingComplete,
     advanceRound,
@@ -59,6 +62,14 @@
       navigate(Paths.MODEL);
     }
   };
+
+  const simulateRecording = () => {
+    simulateRecordingForActiveTeam();
+  };
+
+  const trainNow = async () => {
+    await trainBothTeamModels();
+  };
 </script>
 
 <StandardDialog
@@ -81,6 +92,26 @@
 
 <!-- Display all gestures -->
 <div class="flex flex-col gap-2 pt-3">
+    {#if $adminTestMode}
+      <div class="ml-2 mr-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 flex flex-wrap items-center gap-2 justify-between">
+        <span>Admin test mode er slået til</span>
+        <div class="flex gap-2 flex-wrap">
+          <button
+            type="button"
+            class="rounded-lg border border-amber-400 bg-white px-3 py-1 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition"
+            on:click={simulateRecording}>
+            Simulér optagelse for aktivt hold
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-amber-400 bg-white px-3 py-1 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition"
+            on:click={trainNow}>
+            Træn begge modeller nu
+          </button>
+        </div>
+      </div>
+    {/if}
+
   {#if $jacdacGameMode}
     <div class="ml-2 mr-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex flex-wrap items-center gap-3 justify-between">
       <span>Runde {$currentRound} af 3 til {$classesPerRound} klasser</span>

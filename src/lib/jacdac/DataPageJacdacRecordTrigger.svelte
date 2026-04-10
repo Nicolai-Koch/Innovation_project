@@ -10,7 +10,7 @@
     SRV_LED,
   } from 'jacdac-ts';
   import type { JDDevice, JDService } from 'jacdac-ts';
-  import { connected, devices as jacdacDevices } from './stores';
+  import { connected, devices as jacdacDevices, gameSetupModuleMapping } from './stores';
   import StaticConfiguration from '../../StaticConfiguration';
   import { stores } from '../stores/Stores';
   import { chosenGesture, alertUser } from '../stores/uiStore';
@@ -21,10 +21,22 @@
   import { Feature, getFeature } from '../FeatureToggles';
   import { startRecording } from '../utils/Recording';
   import { navigate, Paths } from '../../router/Router';
-  import { trainKNNModel, trainNNModel } from '../../pages/training/TrainingPage.ts';
+  import { trainBothTeamModels, trainKNNModel, trainNNModel } from '../../pages/training/TrainingPage.ts';
   import ModelRegistry from '../domain/ModelRegistry';
   import { modelTrainingInProgress } from '../stores/ApplicationState';
-  import { classesPerRound, jacdacGameMode } from '../stores/TeamGameStore';
+  import {
+    classesPerRound,
+    GamePhase,
+    jacdacGameMode,
+    setGamePhase,
+    teamAColorId,
+    teamATrainingComplete,
+    teamBColorId,
+    teamBTrainingComplete,
+    teamColorPalette,
+    type TeamKey,
+  } from '../stores/TeamGameStore';
+  import { switchActiveTrainingTeam } from '../../pages/data/DataPage';
 
   let knownDevices: JDDevice[] = [];
   let triggerInProgress = false;
@@ -51,6 +63,43 @@
     return knownDevices.flatMap((device) =>
       device.services().filter((service: JDService) => service.serviceClass === SRV_LED)
     );
+  }
+
+  function getServiceLabel(service: JDService) {
+    return `${service.device?.friendlyName || ''} ${service.device?.name || ''} ${service.id || ''}`.toUpperCase();
+  }
+
+  function serviceMatchesModuleCode(service: JDService, code: string) {
+    return getServiceLabel(service).includes(code.toUpperCase());
+  }
+
+  function pickServiceByCode(services: JDService[], code: string) {
+    return services.find(service => serviceMatchesModuleCode(service, code));
+  }
+
+  function getPlayButtonService() {
+    const buttons = getButtonServices();
+    const mappedPlay = pickServiceByCode(buttons, gameSetupModuleMapping.playButton);
+    if (mappedPlay) {
+      return mappedPlay;
+    }
+
+    const teamAButton = pickServiceByCode(buttons, gameSetupModuleMapping.teamA.button);
+    const teamBButton = pickServiceByCode(buttons, gameSetupModuleMapping.teamB.button);
+    return buttons.find(
+      service => service.id !== teamAButton?.id && service.id !== teamBButton?.id,
+    );
+  }
+
+  function getFallbackTeamButtons() {
+    const playButton = getPlayButtonService();
+    const candidates = getButtonServices()
+      .filter(service => !playButton || service.id !== playButton.id)
+      .sort((a, b) => getServiceLabel(a).localeCompare(getServiceLabel(b)));
+    return {
+      teamA: candidates[0],
+      teamB: candidates[1],
+    };
   }
 
   function getNextGestureToRecord() {
@@ -110,6 +159,17 @@
     );
   }
 
+  function hasEnoughDataForCurrentTeam() {
+    const gestures = stores.getGestures().getGestures();
+    if (gestures.length < $classesPerRound) {
+      return false;
+    }
+
+    return gestures.every(
+      gesture => gesture.getRecordings().length >= StaticConfiguration.minNoOfRecordingsPerGesture,
+    );
+  }
+
   async function getLedPixelCount(service: JDService): Promise<number> {
     const cached = ledPixelCount.get(service.id);
     if (cached) return cached;
@@ -142,7 +202,11 @@
     await service.register(LedReg.Pixels).sendSetPackedAsync([pixels], true);
   }
 
-  async function setCountdownWhiteLeds(service: JDService | undefined, litCount: number) {
+  async function setCountdownLeds(
+    service: JDService | undefined,
+    litCount: number,
+    color: { r: number; g: number; b: number },
+  ) {
     if (!service) return;
 
     const count = await getLedPixelCount(service);
@@ -154,9 +218,9 @@
 
     for (let i = 0; i < count; i++) {
       const isLit = i < safeLitCount;
-      pixels[i * 3] = isLit ? 255 : 0;
-      pixels[i * 3 + 1] = isLit ? 255 : 0;
-      pixels[i * 3 + 2] = isLit ? 255 : 0;
+      pixels[i * 3] = isLit ? color.r : 0;
+      pixels[i * 3 + 1] = isLit ? color.g : 0;
+      pixels[i * 3 + 2] = isLit ? color.b : 0;
     }
 
     await service.register(LedReg.Pixels).sendSetPackedAsync([pixels], true);
@@ -189,6 +253,138 @@
     if (sameDeviceLed) return sameDeviceLed;
 
     return getLedServices()[0];
+  }
+
+  function resolveTeamLedService(team: TeamKey, buttonService: JDService): JDService | undefined {
+    const leds = getLedServices();
+    const teamLedCode = team === 'A' ? gameSetupModuleMapping.teamA.led : gameSetupModuleMapping.teamB.led;
+    const mappedByCode = pickServiceByCode(leds, teamLedCode);
+    if (mappedByCode) return mappedByCode;
+
+    const sameDeviceLed = resolveLedService(buttonService);
+    if (sameDeviceLed) return sameDeviceLed;
+
+    return team === 'A' ? leds[0] : leds[1] || leds[0];
+  }
+
+  function resolveMappedTeamLedService(team: TeamKey): JDService | undefined {
+    const leds = getLedServices();
+    const teamLedCode = team === 'A' ? gameSetupModuleMapping.teamA.led : gameSetupModuleMapping.teamB.led;
+    const mappedByCode = pickServiceByCode(leds, teamLedCode);
+    if (mappedByCode) return mappedByCode;
+
+    return team === 'A' ? leds[0] : leds[1] || leds[0];
+  }
+
+  async function setSingleSpinnerLed(
+    service: JDService | undefined,
+    activeLedIndex: number,
+    color: { r: number; g: number; b: number },
+  ) {
+    if (!service) return;
+
+    const count = await getLedPixelCount(service);
+    if (!count) return;
+
+    const activeLeds = Math.min(count, 8);
+    const safeLedIndex = ((activeLedIndex % activeLeds) + activeLeds) % activeLeds;
+    const pixels = new Uint8Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      const isActive = i === safeLedIndex;
+      pixels[i * 3] = isActive ? color.r : 0;
+      pixels[i * 3 + 1] = isActive ? color.g : 0;
+      pixels[i * 3 + 2] = isActive ? color.b : 0;
+    }
+
+    await service.register(LedReg.Pixels).sendSetPackedAsync([pixels], true);
+  }
+
+  async function trainBothTeamsWithLedAnimation() {
+    const ledA = resolveMappedTeamLedService('A');
+    const ledB = resolveMappedTeamLedService('B');
+    const colorA = getTeamCountdownColor('A');
+    const colorB = getTeamCountdownColor('B');
+
+    const trainingPromise = trainBothTeamModels();
+    let trainingDone = false;
+
+    void trainingPromise.finally(() => {
+      trainingDone = true;
+    });
+
+    let activeLedIndex = 0;
+    while (!trainingDone) {
+      await Promise.all([
+        setSingleSpinnerLed(ledA, activeLedIndex, colorA),
+        setSingleSpinnerLed(ledB, activeLedIndex, colorB),
+      ]);
+      activeLedIndex = (activeLedIndex + 1) % 8;
+      await delay(220);
+    }
+
+    await trainingPromise;
+
+    await Promise.all([
+      setLedColor(ledA, colorA.r, colorA.g, colorA.b),
+      setLedColor(ledB, colorB.r, colorB.g, colorB.b),
+    ]);
+  }
+
+  function getTeamCountdownColor(team: TeamKey) {
+    const colorId = team === 'A' ? $teamAColorId : $teamBColorId;
+    const color = teamColorPalette.find(entry => entry.id === colorId);
+    const hex = color?.hex ?? (team === 'A' ? '#2563eb' : '#dc2626');
+    return {
+      r: Number.parseInt(hex.slice(1, 3), 16),
+      g: Number.parseInt(hex.slice(3, 5), 16),
+      b: Number.parseInt(hex.slice(5, 7), 16),
+    };
+  }
+
+  function resolveTeamFromButtonService(buttonService: JDService): TeamKey | null {
+    const label = getServiceLabel(buttonService);
+    if (label.includes(gameSetupModuleMapping.teamA.button.toUpperCase())) {
+      return 'A';
+    }
+    if (label.includes(gameSetupModuleMapping.teamB.button.toUpperCase())) {
+      return 'B';
+    }
+
+    const fallback = getFallbackTeamButtons();
+    if (fallback.teamA && fallback.teamA.id === buttonService.id) {
+      return 'A';
+    }
+    if (fallback.teamB && fallback.teamB.id === buttonService.id) {
+      return 'B';
+    }
+
+    return null;
+  }
+
+  function isPlayButtonService(buttonService: JDService) {
+    const play = getPlayButtonService();
+    if (!play) {
+      return false;
+    }
+    return play.id === buttonService.id;
+  }
+
+  function handlePlayButtonPress() {
+    if (!$jacdacGameMode) {
+      return;
+    }
+
+    if (!$teamATrainingComplete || !$teamBTrainingComplete) {
+      alertUser('Begge hold skal være helt færdige med træning, før I kan starte spillet.');
+      return;
+    }
+
+    void (async () => {
+      await trainBothTeamsWithLedAnimation();
+      setGamePhase(GamePhase.Playing);
+      navigate(Paths.MODEL);
+    })();
   }
 
   function triggerDataRecording() {
@@ -251,14 +447,19 @@
     }
   }
 
-  async function runLedAndRecord(buttonService: JDService) {
+  async function runLedAndRecord(buttonService: JDService, team: TeamKey) {
     if ($modelTrainingInProgress) return;
 
     const requestedExtraContext = getRequestedExtraRecordingContext();
     const hasRecordingTarget = !!getNextGestureToRecord();
-    const ledService = resolveLedService(buttonService);
+    const ledService = resolveTeamLedService(team, buttonService);
+    const countdownColor = getTeamCountdownColor(team);
 
     if (!requestedExtraContext && hasEnoughDataToTrain()) {
+      if ($jacdacGameMode) {
+        alertUser(`Hold ${team} kan ikke optage mere. Alle klasser er allerede fyldt.`);
+        return;
+      }
       await trainModelFromDataPage(ledService);
       return;
     }
@@ -266,12 +467,15 @@
     // If all current classes are filled and we do not yet have enough data to train,
     // do nothing until the user adds a new class.
     if (!hasRecordingTarget && !requestedExtraContext) {
+      if ($jacdacGameMode) {
+        alertUser(`Hold ${team} kan ikke optage mere. Alle klasser er allerede fyldt.`);
+      }
       return;
     }
 
     // Check if there are multiple incomplete gestures - user should finish the previous one
     const incompleteGestures = getIncompleteGestures();
-    if (incompleteGestures.length > 1) {
+    if (!$jacdacGameMode && incompleteGestures.length > 1) {
       const firstIncompleteGesture = incompleteGestures[0];
       const recordingsCount = firstIncompleteGesture.getRecordings().length;
       const recordingsNeeded = StaticConfiguration.minNoOfRecordingsPerGesture - recordingsCount;
@@ -290,11 +494,11 @@
     try {
       // Show a full white ring and turn off one LED at a time over 7 seconds.
       for (let litLeds = 8; litLeds > 0; litLeds--) {
-        await setCountdownWhiteLeds(ledService, litLeds);
+        await setCountdownLeds(ledService, litLeds, countdownColor);
         await delay(Math.floor(countdownDuration / 8));
       }
 
-      await setCountdownWhiteLeds(ledService, 0);
+      await setCountdownLeds(ledService, 0, countdownColor);
       await setLedColor(ledService, 0, 255, 0);
 
       const didStartRecording = triggerDataRecording();
@@ -309,7 +513,15 @@
 
       await setLedColor(ledService, 255, 0, 0);
       await delay(650);
-      await setLedColor(ledService, 0, 0, 0);
+      await setLedColor(ledService, countdownColor.r, countdownColor.g, countdownColor.b);
+
+      if ($jacdacGameMode && hasEnoughDataForCurrentTeam()) {
+        if (team === 'A') {
+          teamATrainingComplete.set(true);
+        } else {
+          teamBTrainingComplete.set(true);
+        }
+      }
     } catch (e) {
       console.error('Jacdac data trigger failed:', e);
     } finally {
@@ -320,13 +532,27 @@
   function triggerWithCooldown(buttonService: JDService) {
     if (triggerInProgress) return;
 
+    if (isPlayButtonService(buttonService)) {
+      handlePlayButtonPress();
+      return;
+    }
+
+    const team = resolveTeamFromButtonService(buttonService);
+    if (!team) {
+      return;
+    }
+
+    if ($jacdacGameMode) {
+      switchActiveTrainingTeam(team);
+    }
+
     const now = Date.now();
     const key = buttonService.id;
     const last = lastTriggerAt.get(key) ?? 0;
     if (now - last < 180) return;
 
     lastTriggerAt.set(key, now);
-    void runLedAndRecord(buttonService);
+    void runLedAndRecord(buttonService, team);
   }
 
   function subscribeToButtons() {
@@ -334,7 +560,23 @@
 
     if (!get(connected)) return;
 
-    const buttonServices = getButtonServices();
+    const allButtons = getButtonServices();
+    const playButton = getPlayButtonService();
+    const fallbackTeams = getFallbackTeamButtons();
+    const teamButtonIds = new Set(
+      [
+        pickServiceByCode(allButtons, gameSetupModuleMapping.teamA.button)?.id || fallbackTeams.teamA?.id,
+        pickServiceByCode(allButtons, gameSetupModuleMapping.teamB.button)?.id || fallbackTeams.teamB?.id,
+      ].filter((value): value is string => !!value),
+    );
+
+    const buttonServices = allButtons.filter(service => {
+      if (playButton && service.id === playButton.id) {
+        return true;
+      }
+      return teamButtonIds.has(service.id);
+    });
+
     buttonServices.forEach((buttonService) => {
       const downEvent = buttonService.event(ButtonEvent.Down);
       if (downEvent) {

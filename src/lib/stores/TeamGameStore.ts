@@ -6,6 +6,12 @@
 
 import { get } from 'svelte/store';
 import PersistantWritable from '../repository/PersistantWritable';
+import { writable } from 'svelte/store';
+import LiveDataBuffer from '../domain/LiveDataBuffer';
+import MicrobitAccelerometerLiveData, {
+  MicrobitAccelerometerDataVector,
+} from '../livedata/MicrobitAccelerometerData';
+import StaticConfiguration from '../../StaticConfiguration';
 
 export type TeamColor = {
   id: string;
@@ -51,6 +57,34 @@ export const teamBTrainingComplete = new PersistantWritable<boolean>(false, 'tea
 export const teamAScore = new PersistantWritable<number>(0, 'teamAScore');
 export const teamBScore = new PersistantWritable<number>(0, 'teamBScore');
 export const maxClassesPerRound = 6;
+export const modelTrainingTeam = writable<TeamKey | null>(null);
+export const adminTestMode = new PersistantWritable<boolean>(false, 'adminTestMode');
+
+const teamALiveData = new MicrobitAccelerometerLiveData(
+  new LiveDataBuffer<MicrobitAccelerometerDataVector>(StaticConfiguration.accelerometerLiveDataBufferSize),
+);
+const teamBLiveData = new MicrobitAccelerometerLiveData(
+  new LiveDataBuffer<MicrobitAccelerometerDataVector>(StaticConfiguration.accelerometerLiveDataBufferSize),
+);
+
+export const teamALiveXYZ = writable({ x: 0, y: 0, z: 0 });
+export const teamBLiveXYZ = writable({ x: 0, y: 0, z: 0 });
+
+export function pushTeamLiveSample(team: TeamKey, x: number, y: number, z: number) {
+  const sample = new MicrobitAccelerometerDataVector({ x, y, z });
+  if (team === 'A') {
+    teamALiveData.put(sample);
+    teamALiveXYZ.set({ x, y, z });
+    return;
+  }
+
+  teamBLiveData.put(sample);
+  teamBLiveXYZ.set({ x, y, z });
+}
+
+export function getTeamLiveDataSource(team: TeamKey) {
+  return team === 'A' ? teamALiveData : teamBLiveData;
+}
 
 export function setRoundClassCount(nextCount: number) {
   classesPerRound.set(Math.max(3, Math.min(nextCount, maxClassesPerRound)));
@@ -76,7 +110,7 @@ export function setTeamColorByIndex(team: 'A' | 'B', index: number) {
   }
 
   if (team === 'A') {
-    if (get(teamBColorId) === colorId) {
+    if (get(teamBConfirmed) && get(teamBColorId) === colorId) {
       return;
     }
     teamASetupIndex.set(index);
@@ -85,7 +119,7 @@ export function setTeamColorByIndex(team: 'A' | 'B', index: number) {
     return;
   }
 
-  if (get(teamAColorId) === colorId) {
+  if (get(teamAConfirmed) && get(teamAColorId) === colorId) {
     return;
   }
   teamBSetupIndex.set(index);
@@ -93,12 +127,39 @@ export function setTeamColorByIndex(team: 'A' | 'B', index: number) {
   teamBConfirmed.set(false);
 }
 
+export function isColorLockedForTeam(team: 'A' | 'B', colorId: string | null) {
+  if (!colorId) {
+    return false;
+  }
+
+  if (team === 'A') {
+    return get(teamBConfirmed) && get(teamBColorId) === colorId;
+  }
+
+  return get(teamAConfirmed) && get(teamAColorId) === colorId;
+}
+
 export function confirmTeamColor(team: 'A' | 'B') {
+  const colorId = team === 'A' ? get(teamAColorId) : get(teamBColorId);
+  if (isColorLockedForTeam(team, colorId)) {
+    return false;
+  }
+
   if (team === 'A') {
     teamAConfirmed.set(true);
-    return;
+    return true;
   }
   teamBConfirmed.set(true);
+  return true;
+}
+
+export function setTeamColorConfirmation(team: 'A' | 'B', confirmed: boolean) {
+  if (team === 'A') {
+    teamAConfirmed.set(confirmed);
+    return;
+  }
+
+  teamBConfirmed.set(confirmed);
 }
 
 export function isTeamSetupConfirmed(team: 'A' | 'B') {

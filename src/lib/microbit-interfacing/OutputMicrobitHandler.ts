@@ -13,6 +13,8 @@ import { HexOrigin } from './HexOrigin';
 import type Devices from '../domain/Devices';
 import { ModelView, modelView } from '../stores/ApplicationState';
 import { DeviceRequestStates } from '../domain/Devices';
+import { jacdacGameMode, pushTeamLiveSample } from '../stores/TeamGameStore';
+import { get } from 'svelte/store';
 
 class OutputMicrobitHandler implements MicrobitHandler {
   private reconnectTimeout = setTimeout(TypingUtils.emptyFunction, 0);
@@ -70,7 +72,16 @@ class OutputMicrobitHandler implements MicrobitHandler {
     });
   }
 
-  public onAccelerometerDataReceived(x: number, y: number, z: number): void {}
+  public onAccelerometerDataReceived(x: number, y: number, z: number): void {
+    if (!get(jacdacGameMode)) {
+      return;
+    }
+
+    const accelX = x / 1000.0;
+    const accelY = y / 1000.0;
+    const accelZ = z / 1000.0;
+    pushTeamLiveSample('B', accelX, accelY, accelZ);
+  }
 
   public onButtonAPressed(state: MBSpecs.ButtonState): void {}
 

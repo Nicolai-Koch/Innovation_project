@@ -5,21 +5,38 @@
  -->
 
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { stores } from '../lib/stores/Stores';
-  import { hasSomeRecordingData } from './data/DataPage';
+  import {
+    hasSomeRecordingData,
+    loadTeamDatasetSnapshot,
+    resetAllTeamTrainingData,
+    saveTeamDatasetSnapshot,
+    switchActiveTrainingTeam,
+  } from './data/DataPage';
   import DataPageNoData from './data/DataPageNoData.svelte';
   import DataPageWithData from './data/DataPageWithData.svelte';
   import DataPageJacdacRecordTrigger from '../lib/jacdac/DataPageJacdacRecordTrigger.svelte';
-  import { activeTeam, classesPerRound, jacdacGameMode } from '../lib/stores/TeamGameStore';
+  import { activeTeam, jacdacGameMode, type TeamKey } from '../lib/stores/TeamGameStore';
 
   const gestures = stores.getGestures();
-  const devices = stores.getDevices();
+
+  const showTeam = (team: TeamKey) => {
+    switchActiveTrainingTeam(team);
+  };
+
+  const clearAllTeamData = () => {
+    resetAllTeamTrainingData();
+  };
+
+  onMount(() => {
+    if ($jacdacGameMode) {
+      loadTeamDatasetSnapshot($activeTeam);
+    }
+  });
 
   $: if ($jacdacGameMode) {
-    const existing = gestures.getGestures();
-    for (let idx = existing.length; idx < $classesPerRound; idx++) {
-      gestures.createGesture((idx + 1).toString());
-    }
+    saveTeamDatasetSnapshot($activeTeam);
   }
 </script>
 
@@ -27,28 +44,42 @@
 <main class="min-w-full max-w-full h-full min-h-0 flex flex-col">
   <DataPageJacdacRecordTrigger />
 
-  {#if $devices.isInputConnected}
-    <div class="flex justify-center px-3 pt-3">
-      <div class="text-center w-2/3 text-primarytext">
-        <p class="text-2xl font-bold">Træn din egen AI!</p>
-        {#if !$gestures.length}
-          <div class="text-left text-base mt-2 max-w-2xl mx-auto">
-            {#if $jacdacGameMode}
-              <p class="font-semibold">På denne side kan du:</p>
-              <p>1. optage bevægelse til klasse 1, 2, 3 osv. for hold {$activeTeam}</p>
-              <p>2. trykke på Jacdac-knappen for at optage</p>
-              <p>3. lade systemet skifte automatisk til næste klasse efter 3 optagelser</p>
-            {:else}
-              <p class="font-semibold">På denne side kan du:</p>
-              <p>1. trykke på + for at tilføje din helt egen data til AI</p>
-              <p>2. navngiv din bevægelse</p>
-              <p>
-                3. tag din microbit i hånden og begynd at optage den bevægelse du har valgt.
-                Her skal du bare trykke på knappen på din Jacdac
-              </p>
-            {/if}
-          </div>
-        {/if}
+  {#if $jacdacGameMode}
+    <div class="mx-4 mt-2 rounded-xl border border-black border-opacity-15 bg-white bg-opacity-75 p-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="rounded-lg border px-3 py-1 text-sm font-semibold transition"
+            class:border-blue-500={$activeTeam === 'A'}
+            class:bg-blue-50={$activeTeam === 'A'}
+            class:text-blue-800={$activeTeam === 'A'}
+            class:border-slate-300={$activeTeam !== 'A'}
+            class:bg-white={$activeTeam !== 'A'}
+            class:text-slate-700={$activeTeam !== 'A'}
+            on:click={() => showTeam('A')}>
+            Hold A træningsdata
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border px-3 py-1 text-sm font-semibold transition"
+            class:border-red-500={$activeTeam === 'B'}
+            class:bg-red-50={$activeTeam === 'B'}
+            class:text-red-800={$activeTeam === 'B'}
+            class:border-slate-300={$activeTeam !== 'B'}
+            class:bg-white={$activeTeam !== 'B'}
+            class:text-slate-700={$activeTeam !== 'B'}
+            on:click={() => showTeam('B')}>
+            Hold B træningsdata
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="rounded-lg border border-amber-400 bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition"
+          on:click={clearAllTeamData}>
+          Ryd alle optagelser (begge hold)
+        </button>
       </div>
     </div>
   {/if}

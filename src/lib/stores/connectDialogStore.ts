@@ -7,6 +7,7 @@
 import { get, writable } from 'svelte/store';
 import { DeviceRequestStates } from '../domain/Devices';
 import { stores } from './Stores';
+import { jacdacGameMode } from './TeamGameStore';
 
 export enum ConnectDialogStates {
   NONE, // No connection in progress -> Dialog box closed
@@ -31,14 +32,17 @@ export const connectionDialogState = writable<{
 });
 
 export const startConnectionProcess = (): void => {
+  const inputConnected = get(stores.getDevices()).isInputConnected;
+  const useGameModeFlow = get(jacdacGameMode);
+
   // Updating the state will cause a popup to appear, from where the connection process will take place
   connectionDialogState.update(s => {
-    s.connectionState = get(stores.getDevices()).isInputConnected
+    s.connectionState = useGameModeFlow
+      ? ConnectDialogStates.BLUETOOTH
+      : inputConnected
       ? ConnectDialogStates.START_OUTPUT
       : ConnectDialogStates.BLUETOOTH;
-    s.deviceState = get(stores.getDevices()).isInputConnected
-      ? DeviceRequestStates.OUTPUT
-      : DeviceRequestStates.INPUT;
+    s.deviceState = inputConnected ? DeviceRequestStates.OUTPUT : DeviceRequestStates.INPUT;
     return s;
   });
 };

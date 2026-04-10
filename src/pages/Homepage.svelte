@@ -14,6 +14,8 @@
   import { Paths, navigate } from '../router/Router';
   import { isLoading } from '../lib/stores/ApplicationState';
   import {
+    getTeamColorIndexById,
+    isColorLockedForTeam,
     startCompetitiveRound,
     GamePhase,
     gamePhase,
@@ -23,8 +25,10 @@
     teamAConfirmed,
     teamBConfirmed,
     teamColorPalette,
+    setTeamColorByIndex,
     teamAScore,
     teamBScore,
+    adminTestMode,
   } from '../lib/stores/TeamGameStore';
   import { installGameSetupJacdacController } from '../lib/jacdac/stores';
 
@@ -36,13 +40,14 @@
   $: teamAColor = teamColorById($teamAColorId);
   $: teamBColor = teamColorById($teamBColorId);
   $: setupReady =
-    !!teamAColor &&
-    !!teamBColor &&
-    $teamAConfirmed &&
-    $teamBConfirmed &&
-    $devices.isInputAssigned &&
-    $devices.isOutputAssigned &&
-    $connected;
+    $adminTestMode ||
+    (!!teamAColor &&
+      !!teamBColor &&
+      $teamAConfirmed &&
+      $teamBConfirmed &&
+      $devices.isInputAssigned &&
+      $devices.isOutputAssigned &&
+      $connected);
 
   onMount(() => {
     initializeBus();
@@ -51,18 +56,12 @@
   });
 
   const chooseTeamColor = (team: 'A' | 'B', colorId: string) => {
-    if (team === 'A') {
-      if ($teamBColorId === colorId) {
-        return;
-      }
-      teamAColorId.set(colorId);
+    if (isColorLockedForTeam(team, colorId)) {
       return;
     }
 
-    if ($teamAColorId === colorId) {
-      return;
-    }
-    teamBColorId.set(colorId);
+    const colorIndex = getTeamColorIndexById(colorId);
+    setTeamColorByIndex(team, colorIndex);
   };
 
   const openMicrobitConnect = () => {
@@ -80,6 +79,10 @@
     startCompetitiveRound();
     navigate(Paths.DATA);
   };
+
+  const toggleAdminTestMode = () => {
+    adminTestMode.update(value => !value);
+  };
 </script>
 
 <main class="h-full w-full" class:hidden={$isLoading}>
@@ -89,8 +92,28 @@
     <div class="w-full max-w-6xl rounded-2xl border border-gray-200 bg-white shadow-xl p-6 md:p-8">
       <h1 class="text-2xl md:text-3xl font-bold text-center mb-2">Game Setup</h1>
       <p class="text-center text-gray-700 mb-6">
-        Drej rotary encoder for at vælge farve, tryk på holdknappen for at bekræfte, og tryk derefter på spilleknappen for at gaa videre.
+        Drej rotary encoder for at vælge farve, tryk på holdknappen for at bekræfte. Tryk holdknappen igen for at låse op og ændre farve.
       </p>
+
+      <div class="mb-6 flex flex-wrap items-center justify-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <span class="font-semibold">Admin test mode</span>
+        <span>{ $adminTestMode ? 'Slået til' : 'Slået fra' }</span>
+        <button
+          type="button"
+          class="rounded-lg border border-amber-400 bg-white px-3 py-1 font-semibold text-amber-800 hover:bg-amber-100 transition"
+          on:click={toggleAdminTestMode}>
+          { $adminTestMode ? 'Slå fra' : 'Slå til' }
+        </button>
+        <button
+          type="button"
+          class="rounded-lg border border-slate-300 bg-white px-3 py-1 font-semibold text-slate-800 hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          on:click={goToTrainingStep}
+          disabled={!setupReady}
+          title={setupReady ? 'Gå til træning' : 'Slå admin til for at fortsætte uden micro:bits'}>
+          Gå til træning
+        </button>
+        <span class="text-xs text-amber-800">Brug denne for at teste uden micro:bits.</span>
+      </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch mb-6">
         <section class="rounded-2xl border border-gray-200 p-5 bg-slate-50/60">
@@ -102,8 +125,8 @@
                 class="h-10 rounded border-2 transition"
                 class:border-black={$teamAColorId === color.id}
                 class:border-transparent={$teamAColorId !== color.id}
-                class:opacity-40={$teamBColorId === color.id}
-                disabled={$teamBColorId === color.id}
+                class:opacity-40={isColorLockedForTeam('A', color.id)}
+                disabled={isColorLockedForTeam('A', color.id)}
                 style={`background-color: ${color.hex};`}
                 on:click={() => chooseTeamColor('A', color.id)}
                 aria-label={`Vaelg ${color.label} til hold A`} />
@@ -112,7 +135,7 @@
           <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm mb-3">
             <p class="font-semibold">Status</p>
             <p class={$teamAConfirmed ? 'text-green-700' : 'text-amber-700'}>
-              {$teamAConfirmed ? 'Bekræftet' : 'Venter på knaptryk'}
+              {$teamAConfirmed ? 'Bekræftet (tryk igen for at låse op)' : 'Venter på knaptryk'}
             </p>
           </div>
           <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm mb-3">
@@ -135,7 +158,6 @@
             <p class="font-semibold mb-3 text-lg text-center">Jacdac</p>
             <div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-4 text-sm text-slate-700 text-center mb-4">
               <p class="font-semibold">Tilslut Jacdac-moduler her</p>
-              <p>Knappen nederst på skærmen bruges ikke længere.</p>
             </div>
             <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm mb-3">
               <p class="font-semibold">Status</p>
@@ -164,8 +186,8 @@
                 class="h-10 rounded border-2 transition"
                 class:border-black={$teamBColorId === color.id}
                 class:border-transparent={$teamBColorId !== color.id}
-                class:opacity-40={$teamAColorId === color.id}
-                disabled={$teamAColorId === color.id}
+                class:opacity-40={isColorLockedForTeam('B', color.id)}
+                disabled={isColorLockedForTeam('B', color.id)}
                 style={`background-color: ${color.hex};`}
                 on:click={() => chooseTeamColor('B', color.id)}
                 aria-label={`Vaelg ${color.label} til hold B`} />
@@ -174,7 +196,7 @@
           <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm mb-3">
             <p class="font-semibold">Status</p>
             <p class={$teamBConfirmed ? 'text-green-700' : 'text-amber-700'}>
-              {$teamBConfirmed ? 'Bekræftet' : 'Venter på knaptryk'}
+              {$teamBConfirmed ? 'Bekræftet (tryk igen for at låse op)' : 'Venter på knaptryk'}
             </p>
           </div>
           <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm mb-3">
@@ -205,12 +227,6 @@
           on:click={resetGameSession}>
           Nulstil spil
         </button>
-      </div>
-
-      <div class="flex justify-center">
-        <StandardButton medium onClick={goToTrainingStep} color={setupReady ? 'primary' : 'disabled'}>
-          Gaa til træning
-        </StandardButton>
       </div>
     </div>
   </div>

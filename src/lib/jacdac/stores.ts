@@ -21,6 +21,8 @@ import {
   confirmTeamColor,
   GamePhase,
   getTeamColorIdAtIndex,
+  isColorLockedForTeam,
+  setTeamColorConfirmation,
   setGamePhase,
   setTeamColorByIndex,
   teamAColorId,
@@ -150,7 +152,7 @@ type TeamControl = {
   lastPosition: number | undefined;
 };
 
-const explicitModuleMapping = {
+export const gameSetupModuleMapping = {
   teamA: { button: 'BE25', rotary: 'VW69', led: 'UQ37' },
   teamB: { button: 'GM20', rotary: 'ZP69', led: 'PG54' },
   playButton: 'DR57',
@@ -187,7 +189,7 @@ export function installGameSetupJacdacController() {
   }
 
   function getServiceLabel(service: JDService) {
-    return `${service.device?.friendlyName || ''} ${service.device?.name || ''} ${service.deviceId || ''} ${service.id || ''}`;
+    return `${service.device?.friendlyName || ''} ${service.device?.name || ''} ${service.id || ''}`;
   }
 
   function serviceMatchesModuleCode(service: JDService, code: string) {
@@ -251,11 +253,10 @@ export function installGameSetupJacdacController() {
   function chooseTeamColorFromEncoder(team: TeamKey, rawPosition: number, ledService: JDService | undefined) {
     const paletteSize = teamColorPalette.length;
     let nextIndex = positiveModulo(rawPosition, paletteSize);
-    const otherColorId = team === 'A' ? get(teamBColorId) : get(teamAColorId);
 
     for (let attempts = 0; attempts < paletteSize; attempts += 1) {
       const candidateColorId = getTeamColorIdAtIndex(nextIndex);
-      if (candidateColorId !== otherColorId) {
+      if (!isColorLockedForTeam(team, candidateColorId)) {
         setTeamColorByIndex(team, nextIndex);
         void refreshTeamLed(team, ledService, candidateColorId);
         return;
@@ -267,13 +268,33 @@ export function installGameSetupJacdacController() {
 
   function handleTeamButtonPress(team: TeamKey) {
     console.log('Team confirm button pressed:', team);
-    confirmTeamColor(team);
+
+    const currentlyConfirmed = team === 'A' ? get(teamAConfirmed) : get(teamBConfirmed);
+    if (currentlyConfirmed) {
+      setTeamColorConfirmation(team, false);
+      snackbar.sendMessage(`Hold ${team}: farve låst op, vælg ny farve.`);
+      return;
+    }
+
+    const didConfirm = confirmTeamColor(team);
+    if (!didConfirm) {
+      snackbar.sendMessage('Farven er allerede låst af det andet hold. Vælg en anden farve.');
+      return;
+    }
+
     const colorId = team === 'A' ? get(teamAColorId) : get(teamBColorId);
     const control = teamControlBindings.find(entry => entry.team === team);
     void refreshTeamLed(team, control?.ledService, colorId);
   }
 
   function handlePlayButtonPress() {
+    const deviceState = get(stores.getDevices());
+
+    if (!deviceState.isInputAssigned || !deviceState.isOutputAssigned) {
+      snackbar.sendMessage('Tilslut begge micro:bits før I kan gå videre.');
+      return;
+    }
+
     if (!get(teamAConfirmed) || !get(teamBConfirmed)) {
       snackbar.sendMessage('Begge hold skal bekræfte deres farver før spil kan starte.');
       return;
@@ -416,13 +437,13 @@ export function installGameSetupJacdacController() {
     const buttonServices = getServicesByClass(SRV_BUTTON);
     const ledServices = getServicesByClass(SRV_LED);
 
-    const teamAButton = pickServiceByCode(buttonServices, explicitModuleMapping.teamA.button) || buttonServices[0];
-    const teamARotary = pickServiceByCode(rotaryServices, explicitModuleMapping.teamA.rotary) || rotaryServices[0];
-    const teamALed = pickServiceByCode(ledServices, explicitModuleMapping.teamA.led) || ledServices[0];
+    const teamAButton = pickServiceByCode(buttonServices, gameSetupModuleMapping.teamA.button) || buttonServices[0];
+    const teamARotary = pickServiceByCode(rotaryServices, gameSetupModuleMapping.teamA.rotary) || rotaryServices[0];
+    const teamALed = pickServiceByCode(ledServices, gameSetupModuleMapping.teamA.led) || ledServices[0];
 
-    const teamBButton = pickServiceByCode(buttonServices, explicitModuleMapping.teamB.button) || buttonServices[1];
-    const teamBRotary = pickServiceByCode(rotaryServices, explicitModuleMapping.teamB.rotary) || rotaryServices[1];
-    const teamBLed = pickServiceByCode(ledServices, explicitModuleMapping.teamB.led) || ledServices[1];
+    const teamBButton = pickServiceByCode(buttonServices, gameSetupModuleMapping.teamB.button) || buttonServices[1];
+    const teamBRotary = pickServiceByCode(rotaryServices, gameSetupModuleMapping.teamB.rotary) || rotaryServices[1];
+    const teamBLed = pickServiceByCode(ledServices, gameSetupModuleMapping.teamB.led) || ledServices[1];
 
     if (teamARotary && teamAButton) {
       subscribeToTeamControl('A', teamARotary, teamAButton, teamALed);
@@ -432,7 +453,7 @@ export function installGameSetupJacdacController() {
     }
 
     const playButtonService =
-      pickServiceByCode(buttonServices, explicitModuleMapping.playButton) ||
+      pickServiceByCode(buttonServices, gameSetupModuleMapping.playButton) ||
       buttonServices.find(service => {
         return !teamControlBindings.some(control => control.buttonService.id === service.id);
       }) ||

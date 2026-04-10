@@ -7,12 +7,26 @@ import { get, writable } from 'svelte/store';
 import KNNNonNormalizedModelTrainer from '../../lib/mlmodels/KNNNonNormalizedModelTrainer';
 import { stores } from '../../lib/stores/Stores';
 import { type ModelInfo } from '../../lib/domain/ModelRegistry';
+import ModelRegistry from '../../lib/domain/ModelRegistry';
 import LayersModelTrainer, {
   type LossTrainingIteration,
 } from '../../lib/mlmodels/LayersModelTrainer';
 import KNNModelTrainer from '../../lib/mlmodels/KNNModelTrainer';
 import type { ModelTrainer } from '../../lib/domain/ModelTrainer';
 import type { MLModel } from '../../lib/domain/MLModel';
+import { loadTeamDatasetSnapshot } from '../data/DataPage';
+import { modelTrainingInProgress } from '../../lib/stores/ApplicationState';
+import { modelTrainingTeam, type TeamKey } from '../../lib/stores/TeamGameStore';
+
+const trainSelectedModel = async () => {
+  const selectedModel = get(stores.getSelectedModel()).id;
+  if (selectedModel === ModelRegistry.KNN.id) {
+    await trainKNNModel();
+    return;
+  }
+
+  await trainNNModel();
+};
 
 export const loss = writable<LossTrainingIteration[]>([]);
 
@@ -41,7 +55,24 @@ export const trainKNNModel = async () => {
       return new KNNNonNormalizedModelTrainer(knnSettings.k);
     }
   };
-  stores.getClassifier().getModel().train(getKNNModelTrainer());
+  await stores.getClassifier().getModel().train(getKNNModelTrainer());
+};
+
+export const trainModelForTeam = async (team: TeamKey) => {
+  modelTrainingTeam.set(team);
+  loadTeamDatasetSnapshot(team);
+  await trainSelectedModel();
+};
+
+export const trainBothTeamModels = async () => {
+  modelTrainingInProgress.set(true);
+  try {
+    await trainModelForTeam('A');
+    await trainModelForTeam('B');
+  } finally {
+    modelTrainingTeam.set(null);
+    modelTrainingInProgress.set(false);
+  }
 };
 
 export const selectModel = async (model: ModelInfo) => {
