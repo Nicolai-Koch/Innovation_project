@@ -382,7 +382,6 @@
 
     void (async () => {
       await trainBothTeamsWithLedAnimation();
-      setGamePhase(GamePhase.Playing);
       navigate(Paths.MODEL);
     })();
   }

@@ -59,6 +59,16 @@ export const teamBScore = new PersistantWritable<number>(0, 'teamBScore');
 export const maxClassesPerRound = 6;
 export const modelTrainingTeam = writable<TeamKey | null>(null);
 export const adminTestMode = new PersistantWritable<boolean>(false, 'adminTestMode');
+export const teamARaceProgress = writable(0);
+export const teamBRaceProgress = writable(0);
+export const raceWinner = writable<TeamKey | null>(null);
+export const teamAPredictionConfidences = writable<Record<number, number>>({});
+export const teamBPredictionConfidences = writable<Record<number, number>>({});
+
+export const teamRaceSequence: Record<TeamKey, number[]> = {
+  A: [0, 1, 2, 5, 4, 3],
+  B: [3, 4, 5, 2, 1, 0],
+};
 
 const teamALiveData = new MicrobitAccelerometerLiveData(
   new LiveDataBuffer<MicrobitAccelerometerDataVector>(StaticConfiguration.accelerometerLiveDataBufferSize),
@@ -182,6 +192,7 @@ export function resetGameSession() {
   activeTeam.set('A');
   teamATrainingComplete.set(false);
   teamBTrainingComplete.set(false);
+  resetRaceState();
   classesPerRound.set(3);
   currentRound.set(1);
   gamePhase.set(GamePhase.Setup);
@@ -193,6 +204,7 @@ export function startCompetitiveRound() {
   activeTeam.set('A');
   teamATrainingComplete.set(false);
   teamBTrainingComplete.set(false);
+  resetRaceState();
   gamePhase.set(GamePhase.Training);
 }
 
@@ -206,6 +218,80 @@ export function markTeamTrainingComplete(team: TeamKey, isComplete = true) {
     return;
   }
   teamBTrainingComplete.set(isComplete);
+}
+
+export function resetRaceState() {
+  teamARaceProgress.set(0);
+  teamBRaceProgress.set(0);
+  raceWinner.set(null);
+  teamAPredictionConfidences.set({});
+  teamBPredictionConfidences.set({});
+}
+
+export function setTeamPredictionConfidences(
+  team: TeamKey,
+  confidences: Record<number, number>,
+) {
+  if (team === 'A') {
+    teamAPredictionConfidences.set(confidences);
+    return;
+  }
+
+  teamBPredictionConfidences.set(confidences);
+}
+
+export function getTeamRaceProgress(team: TeamKey) {
+  return team === 'A' ? get(teamARaceProgress) : get(teamBRaceProgress);
+}
+
+export function getTeamRaceSequence(team: TeamKey) {
+  return teamRaceSequence[team];
+}
+
+export function getRaceWinner() {
+  return get(raceWinner);
+}
+
+export function setRaceWinner(team: TeamKey) {
+  if (get(raceWinner) !== null) {
+    return;
+  }
+  raceWinner.set(team);
+  gamePhase.set(GamePhase.Finished);
+}
+
+export function advanceTeamRaceProgress(team: TeamKey) {
+  if (get(raceWinner) !== null) {
+    return;
+  }
+
+  const maxProgress = getTeamRaceSequence(team).length;
+
+  if (team === 'A') {
+    teamARaceProgress.update(value => Math.min(value + 1, maxProgress));
+    return;
+  }
+
+  teamBRaceProgress.update(value => Math.min(value + 1, maxProgress));
+}
+
+export function setRaceProgress(team: TeamKey, nextProgress: number) {
+  if (team === 'A') {
+    teamARaceProgress.set(nextProgress);
+    return;
+  }
+
+  teamBRaceProgress.set(nextProgress);
+}
+
+export function startRace() {
+  gamePhase.set(GamePhase.Playing);
+}
+
+export function pauseRace() {
+  if (get(gamePhase) === GamePhase.Playing) {
+    gamePhase.set(GamePhase.Paused);
+  }
 }
 
 export function areBothTeamsTrainingComplete() {

@@ -39,14 +39,11 @@
   let smoothedLiveData = new SmoothedLiveData<LiveDataVector>(liveData, 3);
   let cnt = 0;
 
-  // Subscribing to the stores object, allows us to detect changes in the LiveData store
-  // Without it, reconnecting would cause the component to use an outdated reference of the liveData store.
-  stores.subscribe(e => {
+  // Rebuild smoothing if the component receives a new LiveData source.
+  $: {
+    smoothedLiveData = new SmoothedLiveData<LiveDataVector>(liveData, 3);
     cnt++; // The cnt variable is the key that will force the dimension labels to update
-    if (e.liveData !== undefined) {
-      smoothedLiveData = new SmoothedLiveData(e.liveData, 3);
-    }
-  });
+  }
 
   var canvas: HTMLCanvasElement | undefined = undefined;
   var chart: SmoothieChart | undefined;

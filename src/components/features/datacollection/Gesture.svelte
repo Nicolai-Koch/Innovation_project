@@ -255,9 +255,11 @@
             </div>
           {/if}
         </div>
-        <button class="absolute right-2 top-2 outline-none" type="button" on:click={removeClicked}>
-          <i class="far fa-times-circle fa-lg text-light-800 hover:text-black transition ease" />
-        </button>
+        {#if !$jacdacGameMode}
+          <button class="absolute right-2 top-2 outline-none" type="button" on:click={removeClicked}>
+            <i class="far fa-times-circle fa-lg text-light-800 hover:text-black transition ease" />
+          </button>
+        {/if}
       </div>
     </GestureCard>
 

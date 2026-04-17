@@ -10,7 +10,14 @@
   import { CHANGE, ButtonEvent, ButtonReg, SRV_BUTTON } from 'jacdac-ts';
   import type { JDDevice, JDService } from 'jacdac-ts';
   import { connected, devices as jacdacDevices } from './stores';
-  import { GamePhase, gamePhase, setGamePhase } from '../stores/TeamGameStore';
+  import {
+    GamePhase,
+    gamePhase,
+    pauseRace,
+    resetRaceState,
+    startRace,
+    setGamePhase,
+  } from '../stores/TeamGameStore';
 
   let knownDevices: JDDevice[] = [];
   let unsubscribers: (() => void)[] = [];
@@ -33,10 +40,15 @@
     }
 
     if ($gamePhase === GamePhase.Playing) {
-      setGamePhase(GamePhase.Paused);
+      pauseRace();
       return;
     }
-    setGamePhase(GamePhase.Playing);
+
+    if ($gamePhase === GamePhase.Finished) {
+      resetRaceState();
+    }
+
+    startRace();
   }
 
   function toggleWithCooldown(buttonService: JDService) {

@@ -20,6 +20,7 @@
   import { activeTeam, jacdacGameMode, type TeamKey } from '../lib/stores/TeamGameStore';
 
   const gestures = stores.getGestures();
+  let hasLoadedTeamData = false;
 
   const showTeam = (team: TeamKey) => {
     switchActiveTrainingTeam(team);
@@ -30,12 +31,15 @@
   };
 
   onMount(() => {
+    jacdacGameMode.set(true);
     if ($jacdacGameMode) {
       loadTeamDatasetSnapshot($activeTeam);
+      hasLoadedTeamData = true;
     }
   });
 
-  $: if ($jacdacGameMode) {
+  $: if ($jacdacGameMode && hasLoadedTeamData) {
+    $gestures;
     saveTeamDatasetSnapshot($activeTeam);
   }
 </script>

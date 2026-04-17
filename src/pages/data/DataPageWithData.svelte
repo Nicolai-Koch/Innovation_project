@@ -5,7 +5,6 @@
  -->
 
 <script lang="ts">
-  import { navigate, Paths } from '../../router/Router';
   import StandardDialog from '../../components/ui/dialogs/StandardDialog.svelte';
   import { startConnectionProcess } from '../../lib/stores/connectDialogStore';
   import { t } from '../../i18n';
@@ -21,13 +20,9 @@
   import { trainBothTeamModels } from '../training/TrainingPage';
   import {
     areBothTeamsTrainingComplete,
-    advanceRound,
     activeTeam,
-    classesPerRound,
-    currentRound,
     GamePhase,
     jacdacGameMode,
-    maxClassesPerRound,
     markTeamTrainingComplete,
     setActiveTeam,
     setGamePhase,
@@ -47,8 +42,6 @@
     return Math.max(minNoOfRecordingsPerGesture, requestedTarget, gesture.recordings.length);
   };
 
-  $: reachedRoundClassLimit = $gestures.length >= $classesPerRound;
-
   const finishCurrentTeamTraining = () => {
     if ($activeTeam === 'A') {
       markTeamTrainingComplete('A', true);
@@ -58,8 +51,7 @@
 
     markTeamTrainingComplete('B', true);
     if (areBothTeamsTrainingComplete()) {
-      setGamePhase(GamePhase.Playing);
-      navigate(Paths.MODEL);
+      setGamePhase(GamePhase.Paused);
     }
   };
 
@@ -106,7 +98,7 @@
             type="button"
             class="rounded-lg border border-amber-400 bg-white px-3 py-1 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition"
             on:click={trainNow}>
-            Træn begge modeller nu
+            Træn faelles model nu
           </button>
         </div>
       </div>
@@ -114,7 +106,7 @@
 
   {#if $jacdacGameMode}
     <div class="ml-2 mr-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex flex-wrap items-center gap-3 justify-between">
-      <span>Runde {$currentRound} af 3 til {$classesPerRound} klasser</span>
+      <span>Hold A traener klasse 1-3. Hold B traener klasse 4-6.</span>
       <span>Aktivt hold: Hold {$activeTeam}</span>
       <span>Hold A: {$teamATrainingComplete ? 'færdig' : 'træner'}</span>
       <span>Hold B: {$teamBTrainingComplete ? 'færdig' : 'træner'}</span>
@@ -142,8 +134,6 @@
   {/each}
   {#if !$jacdacGameMode}
     <NewGestureButton />
-  {:else if !reachedRoundClassLimit}
-    <NewGestureButton />
   {:else if $activeTeam === 'A' && !$teamATrainingComplete}
     <button
       type="button"
@@ -158,16 +148,9 @@
       on:click={finishCurrentTeamTraining}>
       Hold B klar til spil
     </button>
-  {:else if $classesPerRound < maxClassesPerRound}
-    <button
-      type="button"
-      class="ml-2 mr-4 mt-2 rounded-lg border border-teal-600 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100 transition"
-      on:click={advanceRound}>
-      Gaa til næste runde (+1 klasse)
-    </button>
   {:else}
     <div class="ml-2 mr-4 mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-      Du har naaet maks antal klasser i denne runde ({$classesPerRound}).
+      Begge hold er klar. Brug play-knappen for at traene modellen og gaa til spil.
     </div>
   {/if}
 </div>

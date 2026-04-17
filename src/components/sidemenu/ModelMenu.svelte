@@ -7,6 +7,22 @@
 <script lang="ts">
   import { t } from '../../i18n';
   import { activeChallenge, activeChallengeNumber } from '../../lib/stores/BoardGameChallengeStore';
+  import {
+    gamePhase,
+    GamePhase,
+    getTeamRaceProgress,
+    getTeamRaceSequence,
+    jacdacGameMode,
+    raceWinner,
+    teamAColorId,
+    teamAPredictionConfidences,
+    teamARaceProgress,
+    teamBColorId,
+    teamBPredictionConfidences,
+    teamBRaceProgress,
+    teamColorPalette,
+    type TeamKey,
+  } from '../../lib/stores/TeamGameStore';
   import { stores } from '../../lib/stores/Stores';
 
   const gestures = stores.getGestures();
@@ -54,6 +70,38 @@
   $: displayedConfidence = frozenSuccessConfidence ?? safeConfidence;
 
   $: confidenceLabel = Math.round(displayedConfidence * 100).toString() + '%';
+
+  function getTeamColor(team: TeamKey) {
+    const colorId = team === 'A' ? $teamAColorId : $teamBColorId;
+    return (
+      teamColorPalette.find(entry => entry.id === colorId)?.hex ??
+      (team === 'A' ? '#2563eb' : '#dc2626')
+    );
+  }
+
+  function getTeamGameMenuData(team: TeamKey) {
+    const sequence = getTeamRaceSequence(team);
+    const progress = getTeamRaceProgress(team);
+    const targetIndex = sequence[Math.min(progress, sequence.length - 1)] ?? 0;
+    const gestureId = targetIndex + 1;
+    const targetGesture = $gestures.find(gesture => gesture.ID === gestureId);
+    const confidences = team === 'A' ? $teamAPredictionConfidences : $teamBPredictionConfidences;
+    const targetConfidence = confidences[gestureId] ?? 0;
+
+    return {
+      team,
+      color: getTeamColor(team),
+      targetClass: gestureId,
+      targetName: targetGesture?.name ?? `Klasse ${gestureId}`,
+      confidence: targetConfidence,
+      progress,
+      total: sequence.length,
+    };
+  }
+
+  $: teamGameData = $jacdacGameMode
+    ? [getTeamGameMenuData('A'), getTeamGameMenuData('B')]
+    : [];
   $: predictionLabel = (() => {
     if (!$gestures.length) {
       return $t('menu.model.noModel');
@@ -114,7 +162,52 @@
 </script>
 
 <div class="w-full text-center justify-center pt-5">
-  {#if !$model.hasModel}
+  {#if $jacdacGameMode}
+    {#if !$model.hasModel}
+      <div
+        class="h-34 w-34 m-auto mb-8 border-2 border-white border-opacity-30 rounded-lg border-dashed font-bold text-warm-gray-300">
+        <div class="flex h-full">
+          <div class="m-auto">
+            {$t('menu.model.noModel')}
+          </div>
+        </div>
+      </div>
+    {:else}
+      <div class="m-auto w-11/12 space-y-3 text-left">
+        {#each teamGameData as teamData (teamData.team)}
+          <div class="rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-sm">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Hold {teamData.team}
+                </p>
+                <p class="text-base font-bold text-slate-900">{teamData.targetName}</p>
+                <p class="text-xs text-slate-500">
+                  Målklasse {teamData.targetClass} • {teamData.progress + 1}/{teamData.total}
+                </p>
+              </div>
+              <div class="text-right">
+                <p class="text-xl font-bold text-slate-800">
+                  {Math.round(teamData.confidence * 100)}%
+                </p>
+                <p class="text-[11px] text-slate-500">sandsynlighed</p>
+              </div>
+            </div>
+
+            {#if $raceWinner}
+              <p class="mt-2 text-xs font-semibold text-green-700">
+                Vinder: Hold {$raceWinner}
+              </p>
+            {:else if $gamePhase === GamePhase.Playing}
+              <p class="mt-2 text-xs font-semibold text-slate-600">Spillet kører</p>
+            {:else}
+              <p class="mt-2 text-xs font-semibold text-slate-600">Afventer start</p>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
+  {:else if !$model.hasModel}
     <div
       class="h-34 w-34 m-auto mb-8 border-2 border-white border-opacity-30 rounded-lg border-dashed font-bold text-warm-gray-300">
       <div class="flex h-full">

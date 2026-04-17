@@ -13,9 +13,9 @@ import type { PersistedGestureData } from '../../lib/domain/stores/gesture/Gestu
 import {
   activeTeam,
   adminTestMode,
-  classesPerRound,
   getTeamLiveDataSource,
   jacdacGameMode,
+  markTeamTrainingComplete,
   type TeamKey,
 } from '../../lib/stores/TeamGameStore';
 import StaticConfiguration from '../../StaticConfiguration';
@@ -24,23 +24,68 @@ import { alertUser } from '../../lib/stores/uiStore';
 
 const customExampleDatasetStorageKey = 'custom-example-dataset-v1';
 const teamDatasetStoragePrefix = 'team-gesture-dataset-v1-';
+const TEAM_CLASS_IDS: Record<TeamKey, number[]> = {
+  A: [1, 2, 3],
+  B: [4, 5, 6],
+};
 
 function getTeamDatasetStorageKey(team: TeamKey) {
   return `${teamDatasetStoragePrefix}${team}`;
 }
 
-function createEmptyGestures(count: number): PersistedGestureData[] {
-  const gestures: PersistedGestureData[] = [];
-  for (let idx = 0; idx < count; idx++) {
-    gestures.push({
-      ID: Date.now() + idx,
-      name: (idx + 1).toString(),
-      recordings: [],
-      output: {},
-      color: StaticConfiguration.gestureColors[idx % StaticConfiguration.gestureColors.length],
-    });
+function createGestureForClass(classId: number): PersistedGestureData {
+  return {
+    ID: classId,
+    name: classId.toString(),
+    recordings: [],
+    output: {},
+    color: StaticConfiguration.gestureColors[(classId - 1) % StaticConfiguration.gestureColors.length],
+  };
+}
+
+function createEmptyGesturesForTeam(team: TeamKey): PersistedGestureData[] {
+  return TEAM_CLASS_IDS[team].map(classId => createGestureForClass(classId));
+}
+
+function resolveClassIdFromGesture(gesture: PersistedGestureData): number | null {
+  if (Number.isInteger(gesture.ID) && gesture.ID > 0) {
+    return gesture.ID;
   }
-  return gestures;
+
+  const parsedName = Number.parseInt(gesture.name, 10);
+  if (Number.isInteger(parsedName) && parsedName > 0) {
+    return parsedName;
+  }
+
+  return null;
+}
+
+function normalizeTeamDatasetSnapshot(
+  team: TeamKey,
+  snapshot: PersistedGestureData[] | null,
+): PersistedGestureData[] {
+  const allowedClassIds = TEAM_CLASS_IDS[team];
+  const existingByClassId = new Map<number, PersistedGestureData>();
+
+  (snapshot ?? []).forEach(gesture => {
+    const classId = resolveClassIdFromGesture(gesture);
+    if (!classId || !allowedClassIds.includes(classId)) {
+      return;
+    }
+
+    existingByClassId.set(classId, {
+      ...gesture,
+      ID: classId,
+      name: classId.toString(),
+      color:
+        gesture.color ||
+        StaticConfiguration.gestureColors[(classId - 1) % StaticConfiguration.gestureColors.length],
+    });
+  });
+
+  return allowedClassIds.map(classId => {
+    return existingByClassId.get(classId) ?? createGestureForClass(classId);
+  });
 }
 
 function serializeCurrentGestures(): PersistedGestureData[] {
@@ -54,6 +99,34 @@ function serializeCurrentGestures(): PersistedGestureData[] {
       output: gesture.getOutput(),
       color: gesture.getColor(),
     }));
+}
+
+export function getStoredTeamDatasetSnapshot(team: TeamKey): PersistedGestureData[] | null {
+  const stored = localStorage.getItem(getTeamDatasetStorageKey(team));
+  if (!stored) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as PersistedGestureData[];
+    return Array.isArray(parsed) ? normalizeTeamDatasetSnapshot(team, parsed) : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasEnoughDataForTraining(
+  gestures: Array<{ recordings: RecordingData[] }>,
+  requiredCount: number,
+): boolean {
+
+  return (
+    gestures.length >= requiredCount &&
+    gestures.every(
+      gesture =>
+        gesture.recordings.length >= StaticConfiguration.minNoOfRecordingsPerGesture,
+    )
+  );
 }
 
 export const importExampleDataset = () => {
@@ -80,31 +153,40 @@ export const saveCurrentAsExampleDataset = () => {
 };
 
 export const saveTeamDatasetSnapshot = (team: TeamKey) => {
-  const snapshot = serializeCurrentGestures();
+  const snapshot = normalizeTeamDatasetSnapshot(team, serializeCurrentGestures());
   localStorage.setItem(getTeamDatasetStorageKey(team), JSON.stringify(snapshot));
+  markTeamTrainingComplete(team, hasEnoughDataForTraining(snapshot, TEAM_CLASS_IDS[team].length));
 };
 
 export const loadTeamDatasetSnapshot = (team: TeamKey) => {
   const gestures = stores.getGestures();
   const availableAxes = stores.getAvailableAxes();
-  const stored = localStorage.getItem(getTeamDatasetStorageKey(team));
+  const normalizedSnapshot = normalizeTeamDatasetSnapshot(team, getStoredTeamDatasetSnapshot(team));
 
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored) as PersistedGestureData[];
-      if (Array.isArray(parsed)) {
-        gestures.importFrom(parsed);
-        availableAxes.loadFromGestures();
-        return;
-      }
-    } catch {
-      // Ignore malformed snapshots and rebuild from defaults below.
-    }
-  }
-
-  const requiredCount = get(jacdacGameMode) ? 3 : StaticConfiguration.minNoOfGestures;
-  gestures.importFrom(createEmptyGestures(requiredCount));
+  localStorage.setItem(getTeamDatasetStorageKey(team), JSON.stringify(normalizedSnapshot));
+  gestures.importFrom(normalizedSnapshot);
   availableAxes.loadFromGestures();
+  markTeamTrainingComplete(
+    team,
+    hasEnoughDataForTraining(normalizedSnapshot, TEAM_CLASS_IDS[team].length),
+  );
+};
+
+export const getCombinedTeamDatasetSnapshot = (): PersistedGestureData[] => {
+  const teamASnapshot = normalizeTeamDatasetSnapshot('A', getStoredTeamDatasetSnapshot('A'));
+  const teamBSnapshot = normalizeTeamDatasetSnapshot('B', getStoredTeamDatasetSnapshot('B'));
+
+  return [...teamASnapshot, ...teamBSnapshot].sort((left, right) => left.ID - right.ID);
+};
+
+export const loadCombinedTeamDatasetSnapshot = () => {
+  const gestures = stores.getGestures();
+  const availableAxes = stores.getAvailableAxes();
+  const combinedSnapshot = getCombinedTeamDatasetSnapshot();
+
+  gestures.importFrom(combinedSnapshot);
+  availableAxes.loadFromGestures();
+  return combinedSnapshot;
 };
 
 export const switchActiveTrainingTeam = (nextTeam: TeamKey) => {
@@ -124,13 +206,13 @@ export const switchActiveTrainingTeam = (nextTeam: TeamKey) => {
 };
 
 export const resetAllTeamTrainingData = () => {
-  const requiredCount = get(jacdacGameMode) ? 3 : StaticConfiguration.minNoOfGestures;
-
-  const teamAEmpty = createEmptyGestures(requiredCount);
-  const teamBEmpty = createEmptyGestures(requiredCount);
+  const teamAEmpty = createEmptyGesturesForTeam('A');
+  const teamBEmpty = createEmptyGesturesForTeam('B');
 
   localStorage.setItem(getTeamDatasetStorageKey('A'), JSON.stringify(teamAEmpty));
   localStorage.setItem(getTeamDatasetStorageKey('B'), JSON.stringify(teamBEmpty));
+  markTeamTrainingComplete('A', false);
+  markTeamTrainingComplete('B', false);
 
   const currentTeam = get(activeTeam);
   const gestures = stores.getGestures();

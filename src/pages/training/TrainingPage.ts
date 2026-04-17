@@ -14,9 +14,14 @@ import LayersModelTrainer, {
 import KNNModelTrainer from '../../lib/mlmodels/KNNModelTrainer';
 import type { ModelTrainer } from '../../lib/domain/ModelTrainer';
 import type { MLModel } from '../../lib/domain/MLModel';
-import { loadTeamDatasetSnapshot } from '../data/DataPage';
+import { loadCombinedTeamDatasetSnapshot } from '../data/DataPage';
 import { modelTrainingInProgress } from '../../lib/stores/ApplicationState';
-import { modelTrainingTeam, type TeamKey } from '../../lib/stores/TeamGameStore';
+import {
+  GamePhase,
+  jacdacGameMode,
+  resetRaceState,
+  setGamePhase,
+} from '../../lib/stores/TeamGameStore';
 
 const trainSelectedModel = async () => {
   const selectedModel = get(stores.getSelectedModel()).id;
@@ -58,19 +63,21 @@ export const trainKNNModel = async () => {
   await stores.getClassifier().getModel().train(getKNNModelTrainer());
 };
 
-export const trainModelForTeam = async (team: TeamKey) => {
-  modelTrainingTeam.set(team);
-  loadTeamDatasetSnapshot(team);
-  await trainSelectedModel();
-};
-
 export const trainBothTeamModels = async () => {
   modelTrainingInProgress.set(true);
+
   try {
-    await trainModelForTeam('A');
-    await trainModelForTeam('B');
+    if (get(jacdacGameMode)) {
+      loadCombinedTeamDatasetSnapshot();
+    }
+
+    await trainSelectedModel();
+
+    if (get(jacdacGameMode)) {
+      resetRaceState();
+      setGamePhase(GamePhase.Paused);
+    }
   } finally {
-    modelTrainingTeam.set(null);
     modelTrainingInProgress.set(false);
   }
 };
