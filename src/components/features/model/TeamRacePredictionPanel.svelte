@@ -13,16 +13,19 @@
   import StaticConfiguration from '../../../StaticConfiguration';
   import { stores } from '../../../lib/stores/Stores';
   import {
-    advanceTeamRaceProgress,
     gamePhase,
     GamePhase,
+    getCurrentTeamChallengeId,
     getRaceWinner,
     getTeamLiveDataSource,
     getTeamRaceProgress,
     getTeamRaceSequence,
+    markTeamChallengeAttemptSuccess,
     raceWinner,
+    teamAChallengeState,
     setTeamPredictionConfidences,
     setRaceWinner,
+    teamBChallengeState,
     teamAColorId,
     teamARaceProgress,
     teamBColorId,
@@ -42,7 +45,6 @@
 
   export let team: TeamKey;
 
-  const confidenceThreshold = 0.8;
   const classifier = stores.getClassifier();
   const gesturesStore = stores.getGestures();
   const model = classifier.getModel();
@@ -58,6 +60,7 @@
   let statusText = 'Venter paa start';
   let topPrediction: PredictionRow | undefined;
   let currentTargetClassIndex = 0;
+  let activeThreshold = StaticConfiguration.defaultRequiredConfidence;
   let pollingInterval: ReturnType<typeof setInterval> | undefined;
   let predictionInFlight = false;
   let refreshQueued = false;
@@ -93,6 +96,23 @@
     orderedPredictionRows = sequence
       .map(classIndex => predictionRows[classIndex])
       .filter((row): row is PredictionRow => !!row);
+  }
+
+  function getRowVisualState(classIndex: number) {
+    const sequence = getTeamRaceSequence(team);
+    const progress = getTeamRaceProgress(team);
+    const challengeState = get(team === 'A' ? teamAChallengeState : teamBChallengeState);
+    const position = sequence.indexOf(classIndex);
+
+    if (position >= 0 && position < progress) {
+      return 'completed';
+    }
+
+    if (position === progress && challengeState.status !== 'passed') {
+      return 'active';
+    }
+
+    return 'idle';
   }
 
   function ensurePredictionRows() {
@@ -131,6 +151,7 @@
     const currentToken = ++refreshToken;
     const snapshot = ensurePredictionRows();
     const sequence = getTeamRaceSequence(team);
+    const challengeState = get(team === 'A' ? teamAChallengeState : teamBChallengeState);
 
     if (snapshot.length === 0) {
       statusText = 'Ingen klasser fundet';
@@ -139,17 +160,41 @@
 
     const progress = getTeamRaceProgress(team);
     currentTargetClassIndex = sequence[Math.min(progress, sequence.length - 1)] ?? 0;
+    activeThreshold = challengeState.threshold;
 
     if (!$model.isTrained) {
       statusText = 'Model ikke traenet endnu';
       return;
     }
 
-    if (get(gamePhase) !== GamePhase.Playing) {
+    if (get(gamePhase) !== GamePhase.Playing && get(gamePhase) !== GamePhase.Paused) {
       const winner = get(raceWinner);
       statusText = winner
         ? `Hold ${winner} vandt`
-        : 'Tryk start for at spille';
+        : 'Afventer holdknap';
+      return;
+    }
+
+    if (challengeState.status !== 'attempt') {
+      setTeamPredictionConfidences(team, {});
+      predictionRows = predictionRows.map(row => ({
+        ...row,
+        confidence: 0,
+      }));
+      rebuildOrderedRows();
+      topPrediction = undefined;
+
+      if (challengeState.status === 'countdown') {
+        statusText = `Hold ${team}: Countdown...`;
+      } else if (challengeState.status === 'passed') {
+        statusText = 'Alle udfordringer klaret';
+      } else if (challengeState.status === 'failed') {
+        statusText = 'Ikke klaret. Holdknap = prov igen, spilleknap = retrain';
+      } else if (challengeState.status === 'awaiting-retrain') {
+        statusText = 'Tilfoej optagelse og traen igen paa Traen AI siden';
+      } else {
+        statusText = 'Tryk holdknap for countdown';
+      }
       return;
     }
 
@@ -193,25 +238,19 @@
         return;
       }
 
-      let nextProgress = getTeamRaceProgress(team);
-      const targetClassIndex = sequence[nextProgress];
-      const targetConfidence = predictionRows[targetClassIndex]?.confidence ?? 0;
+      const targetClassId = getCurrentTeamChallengeId(team);
+      const targetClassIndex = targetClassId !== null ? targetClassId - 1 : null;
+      const targetConfidence =
+        targetClassIndex !== null ? predictionRows[targetClassIndex]?.confidence ?? 0 : 0;
 
-      if (targetClassIndex !== undefined && targetConfidence >= confidenceThreshold) {
-        advanceTeamRaceProgress(team);
-        nextProgress = getTeamRaceProgress(team);
-      }
-
-      if (nextProgress >= sequence.length) {
-        setRaceWinner(team);
-        statusText = `Hold ${team} vandt`;
-        currentTargetClassIndex = sequence[sequence.length - 1] ?? 0;
+      if (targetClassIndex !== null && targetConfidence >= activeThreshold) {
+        markTeamChallengeAttemptSuccess(team);
+        statusText = `Klaret! ${Math.round(targetConfidence * 100)}%`; 
         return;
       }
 
-      currentTargetClassIndex = sequence[nextProgress] ?? currentTargetClassIndex;
       const currentClassName = predictionRows[currentTargetClassIndex]?.name ?? '-';
-      statusText = `Maal klasse ${currentClassName} (${nextProgress + 1}/${sequence.length})`;
+      statusText = `Maal klasse ${currentClassName} (>= ${Math.round(activeThreshold * 100)}%)`;
     } catch {
       if (currentToken !== refreshToken) {
         return;
@@ -234,7 +273,7 @@
     }
 
     pollingInterval = setInterval(() => {
-      if (get(gamePhase) === GamePhase.Playing) {
+      if (get(gamePhase) === GamePhase.Playing || get(gamePhase) === GamePhase.Paused) {
         void refreshPredictions();
       }
     }, panelPollingInterval);
@@ -259,7 +298,7 @@
       highlightedAxes.subscribe(() => void refreshPredictions()),
       gesturesStore.subscribe(() => void refreshPredictions()),
       gamePhase.subscribe(() => {
-        if (get(gamePhase) === GamePhase.Playing) {
+        if (get(gamePhase) === GamePhase.Playing || get(gamePhase) === GamePhase.Paused) {
           startPredictionPolling();
         } else {
           stopPredictionPolling();
@@ -268,6 +307,7 @@
       }),
       raceProgressStore.subscribe(() => void refreshPredictions()),
       raceWinner.subscribe(() => void refreshPredictions()),
+      (team === 'A' ? teamAChallengeState : teamBChallengeState).subscribe(() => void refreshPredictions()),
       model.subscribe(() => void refreshPredictions()),
     ];
 
@@ -313,17 +353,31 @@
       </div>
 
       {#each orderedPredictionRows as row (row.id)}
-        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
+        {@const rowState = getRowVisualState(row.classIndex)}
+        <div
+          class="rounded-xl border px-4 py-3"
+          class:border-green-300={rowState === 'completed'}
+          class:bg-green-50={rowState === 'completed'}
+          class:border-amber-400={rowState === 'active'}
+          class:bg-amber-50={rowState === 'active'}
+          class:border-slate-200={rowState === 'idle'}
+          class:bg-white={rowState === 'idle'}>
           <div class="flex items-center justify-between gap-4">
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <div class="h-2.5 w-2.5 rounded-full bg-slate-400" />
+                <div
+                  class="h-2.5 w-2.5 rounded-full"
+                  class:bg-green-600={rowState === 'completed'}
+                  class:bg-amber-500={rowState === 'active'}
+                  class:bg-slate-400={rowState === 'idle'} />
                 <h3 class="truncate font-semibold text-slate-900">{row.name}</h3>
               </div>
               <p class="mt-1 text-xs text-slate-500">
                 {row.recordings} optagelser
-                {#if row.classIndex === currentTargetClassIndex}
-                  . Maal: 80%+
+                {#if rowState === 'active'}
+                  . Maal: {Math.round(activeThreshold * 100)}%+
+                {:else if rowState === 'completed'}
+                  . Klaret
                 {/if}
               </p>
             </div>

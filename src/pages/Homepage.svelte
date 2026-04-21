@@ -28,7 +28,6 @@
     setTeamColorByIndex,
     teamAScore,
     teamBScore,
-    adminTestMode,
   } from '../lib/stores/TeamGameStore';
   import { installGameSetupJacdacController } from '../lib/jacdac/stores';
 
@@ -40,14 +39,13 @@
   $: teamAColor = teamColorById($teamAColorId);
   $: teamBColor = teamColorById($teamBColorId);
   $: setupReady =
-    $adminTestMode ||
-    (!!teamAColor &&
-      !!teamBColor &&
-      $teamAConfirmed &&
-      $teamBConfirmed &&
-      $devices.isInputAssigned &&
-      $devices.isOutputAssigned &&
-      $connected);
+    !!teamAColor &&
+    !!teamBColor &&
+    $teamAConfirmed &&
+    $teamBConfirmed &&
+    $devices.isInputAssigned &&
+    $devices.isOutputAssigned &&
+    $connected;
 
   onMount(() => {
     initializeBus();
@@ -79,10 +77,6 @@
     startCompetitiveRound();
     navigate(Paths.DATA);
   };
-
-  const toggleAdminTestMode = () => {
-    adminTestMode.update(value => !value);
-  };
 </script>
 
 <main class="h-full w-full" class:hidden={$isLoading}>
@@ -95,24 +89,15 @@
         Drej rotary encoder for at vælge farve, tryk på holdknappen for at bekræfte. Tryk holdknappen igen for at låse op og ændre farve.
       </p>
 
-      <div class="mb-6 flex flex-wrap items-center justify-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        <span class="font-semibold">Admin test mode</span>
-        <span>{ $adminTestMode ? 'Slået til' : 'Slået fra' }</span>
+      <div class="mb-6 flex flex-wrap items-center justify-center gap-3">
         <button
           type="button"
-          class="rounded-lg border border-amber-400 bg-white px-3 py-1 font-semibold text-amber-800 hover:bg-amber-100 transition"
-          on:click={toggleAdminTestMode}>
-          { $adminTestMode ? 'Slå fra' : 'Slå til' }
-        </button>
-        <button
-          type="button"
-          class="rounded-lg border border-slate-300 bg-white px-3 py-1 font-semibold text-slate-800 hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          class="rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold text-slate-800 hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
           on:click={goToTrainingStep}
           disabled={!setupReady}
-          title={setupReady ? 'Gå til træning' : 'Slå admin til for at fortsætte uden micro:bits'}>
+          title={setupReady ? 'Gå til træning' : 'Alle tilslutninger skal være klar'}>
           Gå til træning
         </button>
-        <span class="text-xs text-amber-800">Brug denne for at teste uden micro:bits.</span>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch mb-6">

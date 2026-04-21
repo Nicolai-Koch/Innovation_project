@@ -12,7 +12,6 @@ import type { GestureData } from '../../lib/domain/stores/gesture/Gesture';
 import type { PersistedGestureData } from '../../lib/domain/stores/gesture/Gestures';
 import {
   activeTeam,
-  adminTestMode,
   getTeamLiveDataSource,
   jacdacGameMode,
   markTeamTrainingComplete,
@@ -223,56 +222,7 @@ export const resetAllTeamTrainingData = () => {
   stores.setLiveData(getTeamLiveDataSource(currentTeam));
 };
 
-export const simulateRecordingForActiveTeam = () => {
-  if (!get(adminTestMode)) {
-    alertUser('Admin-tilstand skal være slået til for at simulere optagelser.');
-    return false;
-  }
 
-  const gestures = stores.getGestures();
-  const availableAxes = stores.getAvailableAxes();
-  const currentTeam = get(activeTeam);
-
-  if (gestures.getGestures().length === 0) {
-    loadTeamDatasetSnapshot(currentTeam);
-  }
-
-  const teamGestures = gestures.getGestures();
-  const targetGesture =
-    teamGestures.find(
-      gesture => gesture.getRecordings().length < StaticConfiguration.minNoOfRecordingsPerGesture,
-    ) ?? teamGestures[0];
-
-  if (!targetGesture) {
-    alertUser('Der er ingen klasse at simulere en optagelse på.');
-    return false;
-  }
-
-  const seed = (targetGesture.getId() % 10) + (currentTeam === 'A' ? 0 : 5);
-  const samples: RecordingData['samples'] = [];
-
-  for (let idx = 0; idx < 24; idx++) {
-    const angle = (idx + seed) / 4;
-    samples.push({
-      vector: [
-        Math.sin(angle) * 0.8 + seed * 0.05,
-        Math.cos(angle * 1.2) * 0.8 + seed * 0.03,
-        Math.sin(angle * 0.7 + 0.5) * 0.8,
-      ],
-    });
-  }
-
-  const syntheticRecording: RecordingData = {
-    ID: Date.now(),
-    samples,
-    labels: ['X', 'Y', 'Z'],
-  };
-
-  targetGesture.addRecording(syntheticRecording);
-  availableAxes.loadFromGestures();
-  stores.setLiveData(getTeamLiveDataSource(currentTeam));
-  return true;
-};
 
 export const importStoredOrDefaultExampleDataset = () => {
   const gestures = stores.getGestures();

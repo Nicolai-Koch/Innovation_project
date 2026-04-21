@@ -10,16 +10,14 @@
   import LiveGraph from '../../components/features/graphs/LiveGraph.svelte';
   import { modelView, ModelView } from '../../lib/stores/ApplicationState';
   import TeamRacePredictionPanel from '../../components/features/model/TeamRacePredictionPanel.svelte';
+  import ModelPageJacdacChallengeTrigger from '../../lib/jacdac/ModelPageJacdacChallengeTrigger.svelte';
   import {
     activeTeam,
     getTeamLiveDataSource,
     gamePhase,
     GamePhase,
     jacdacGameMode,
-    pauseRace,
     raceWinner,
-    resetRaceState,
-    startRace,
     teamATrainingComplete,
     teamBTrainingComplete,
   } from '../../lib/stores/TeamGameStore';
@@ -40,23 +38,12 @@
     stores.setLiveData(getTeamLiveDataSource(get(activeTeam)));
     stores.getAvailableAxes().loadFromGestures();
   });
-
-  const toggleGamePhase = () => {
-    if ($gamePhase === GamePhase.Playing) {
-      pauseRace();
-      return;
-    }
-
-    if ($gamePhase === GamePhase.Finished) {
-      resetRaceState();
-    }
-
-    startRace();
-  };
 </script>
 
 <div class="pt-4 pl-3 pr-3">
   {#if $jacdacGameMode}
+    <ModelPageJacdacChallengeTrigger />
+
     <div class="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-700">
         <span>Fase: {$gamePhase}</span>
@@ -65,22 +52,12 @@
         <span>
           {#if $raceWinner}
             Vinder: Hold {$raceWinner}
-          {:else if $gamePhase === GamePhase.Paused}
-            Afventer start
+          {:else if $gamePhase === GamePhase.Paused || $gamePhase === GamePhase.Training}
+            Afventer holdknap
           {:else if $gamePhase === GamePhase.Playing}
-            Begge hold spiller paa hver sin live-stream
+            Holdknap starter challenge-vindue
           {/if}
         </span>
-        <button
-          type="button"
-          class="rounded border border-slate-300 bg-slate-50 px-3 py-1 font-semibold hover:bg-slate-100"
-          on:click={toggleGamePhase}>
-          {$gamePhase === GamePhase.Playing
-            ? 'Pause spil'
-            : $gamePhase === GamePhase.Finished
-              ? 'Start nyt spil'
-              : 'Start spil'}
-        </button>
       </div>
     </div>
 

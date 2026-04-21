@@ -58,16 +58,56 @@ export const teamAScore = new PersistantWritable<number>(0, 'teamAScore');
 export const teamBScore = new PersistantWritable<number>(0, 'teamBScore');
 export const maxClassesPerRound = 6;
 export const modelTrainingTeam = writable<TeamKey | null>(null);
-export const adminTestMode = new PersistantWritable<boolean>(false, 'adminTestMode');
 export const teamARaceProgress = writable(0);
 export const teamBRaceProgress = writable(0);
 export const raceWinner = writable<TeamKey | null>(null);
 export const teamAPredictionConfidences = writable<Record<number, number>>({});
 export const teamBPredictionConfidences = writable<Record<number, number>>({});
 
+export type TeamChallengeStatus =
+  | 'ready'
+  | 'countdown'
+  | 'attempt'
+  | 'passed'
+  | 'failed'
+  | 'awaiting-retrain';
+
+export type TeamChallengeAction =
+  | 'none'
+  | 'start-attempt';
+
+export type TeamPlayButtonAction =
+  | 'none'
+  | 'request-extra-recording'
+  | 'lower-threshold';
+
+export type TeamChallengeState = {
+  status: TeamChallengeStatus;
+  threshold: number;
+  challengeId: number | null;
+  countdownEndsAt: number | null;
+  attemptEndsAt: number | null;
+};
+
+const defaultChallengeState = (): TeamChallengeState => ({
+  status: 'ready',
+  threshold: StaticConfiguration.defaultRequiredConfidence,
+  challengeId: null,
+  countdownEndsAt: null,
+  attemptEndsAt: null,
+});
+
+export const teamAChallengeState = writable<TeamChallengeState>(defaultChallengeState());
+export const teamBChallengeState = writable<TeamChallengeState>(defaultChallengeState());
+export const teamAExtraRecordingUsedByClass = writable<Record<number, boolean>>({});
+export const teamBExtraRecordingUsedByClass = writable<Record<number, boolean>>({});
+export const teamAThresholdReducedByClass = writable<Record<number, boolean>>({});
+export const teamBThresholdReducedByClass = writable<Record<number, boolean>>({});
+export const lastFailedTeamForRetrain = writable<TeamKey | null>(null);
+
 export const teamRaceSequence: Record<TeamKey, number[]> = {
-  A: [0, 1, 2, 5, 4, 3],
-  B: [3, 4, 5, 2, 1, 0],
+  A: [0, 1, 2],
+  B: [3, 4, 5],
 };
 
 const teamALiveData = new MicrobitAccelerometerLiveData(
@@ -226,6 +266,13 @@ export function resetRaceState() {
   raceWinner.set(null);
   teamAPredictionConfidences.set({});
   teamBPredictionConfidences.set({});
+  teamAChallengeState.set(defaultChallengeState());
+  teamBChallengeState.set(defaultChallengeState());
+  teamAExtraRecordingUsedByClass.set({});
+  teamBExtraRecordingUsedByClass.set({});
+  teamAThresholdReducedByClass.set({});
+  teamBThresholdReducedByClass.set({});
+  lastFailedTeamForRetrain.set(null);
 }
 
 export function setTeamPredictionConfidences(
@@ -246,6 +293,184 @@ export function getTeamRaceProgress(team: TeamKey) {
 
 export function getTeamRaceSequence(team: TeamKey) {
   return teamRaceSequence[team];
+}
+
+export function getCurrentTeamChallengeId(team: TeamKey): number | null {
+  const sequence = getTeamRaceSequence(team);
+  const progress = getTeamRaceProgress(team);
+  const classIndex = sequence[Math.min(progress, sequence.length - 1)];
+  if (classIndex === undefined) {
+    return null;
+  }
+
+  return classIndex + 1;
+}
+
+function getTeamChallengeStateStore(team: TeamKey) {
+  return team === 'A' ? teamAChallengeState : teamBChallengeState;
+}
+
+function getExtraRecordingUsageStore(team: TeamKey) {
+  return team === 'A' ? teamAExtraRecordingUsedByClass : teamBExtraRecordingUsedByClass;
+}
+
+function getThresholdReducedStore(team: TeamKey) {
+  return team === 'A' ? teamAThresholdReducedByClass : teamBThresholdReducedByClass;
+}
+
+function getThresholdForClass(team: TeamKey, challengeId: number) {
+  const reducedByClass = get(getThresholdReducedStore(team));
+  return reducedByClass[challengeId] ? 0.7 : StaticConfiguration.defaultRequiredConfidence;
+}
+
+function setTeamChallengeStatus(team: TeamKey, status: TeamChallengeStatus, challengeId: number | null) {
+  const nextThreshold = challengeId ? getThresholdForClass(team, challengeId) : StaticConfiguration.defaultRequiredConfidence;
+  getTeamChallengeStateStore(team).set({
+    status,
+    threshold: nextThreshold,
+    challengeId,
+    countdownEndsAt: null,
+    attemptEndsAt: null,
+  });
+}
+
+export function beginTeamChallengeCountdown(team: TeamKey, durationMs: number) {
+  const challengeId = getCurrentTeamChallengeId(team);
+  if (!challengeId) {
+    return;
+  }
+
+  getTeamChallengeStateStore(team).set({
+    status: 'countdown',
+    threshold: getThresholdForClass(team, challengeId),
+    challengeId,
+    countdownEndsAt: Date.now() + durationMs,
+    attemptEndsAt: null,
+  });
+}
+
+export function beginTeamChallengeAttemptWindow(team: TeamKey, durationMs: number) {
+  const challengeId = getCurrentTeamChallengeId(team);
+  if (!challengeId) {
+    return;
+  }
+
+  getTeamChallengeStateStore(team).set({
+    status: 'attempt',
+    threshold: getThresholdForClass(team, challengeId),
+    challengeId,
+    countdownEndsAt: null,
+    attemptEndsAt: Date.now() + durationMs,
+  });
+}
+
+export function markTeamChallengeAttemptSuccess(team: TeamKey) {
+  if (get(raceWinner) !== null) {
+    return;
+  }
+
+  advanceTeamRaceProgress(team);
+  const progress = getTeamRaceProgress(team);
+  const sequenceLength = getTeamRaceSequence(team).length;
+
+  if (progress >= sequenceLength) {
+    setTeamChallengeStatus(team, 'passed', getCurrentTeamChallengeId(team));
+    setRaceWinner(team);
+    return;
+  }
+
+  setTeamChallengeStatus(team, 'ready', getCurrentTeamChallengeId(team));
+}
+
+export function markTeamChallengeAttemptFailed(team: TeamKey) {
+  const challengeId = getCurrentTeamChallengeId(team);
+  lastFailedTeamForRetrain.set(team);
+  setTeamChallengeStatus(team, 'failed', challengeId);
+}
+
+export function handleTeamChallengeButtonPress(team: TeamKey): TeamChallengeAction {
+  if (get(raceWinner) !== null) {
+    return 'none';
+  }
+
+  const currentChallengeId = getCurrentTeamChallengeId(team);
+  if (!currentChallengeId) {
+    return 'none';
+  }
+
+  const stateStore = getTeamChallengeStateStore(team);
+  const state = get(stateStore);
+
+  if (state.status === 'countdown' || state.status === 'attempt') {
+    return 'none';
+  }
+
+  if (state.status === 'failed') {
+    setTeamChallengeStatus(team, 'ready', currentChallengeId);
+    return 'start-attempt';
+  }
+
+  if (state.status === 'awaiting-retrain') {
+    return 'none';
+  }
+
+  return 'start-attempt';
+}
+
+export function requestTeamChallengeRetraining(team: TeamKey): TeamPlayButtonAction {
+  if (get(raceWinner) !== null) {
+    return 'none';
+  }
+
+  const currentChallengeId = getCurrentTeamChallengeId(team);
+  if (!currentChallengeId) {
+    return 'none';
+  }
+
+  const state = get(getTeamChallengeStateStore(team));
+  if (state.status !== 'failed' && state.status !== 'awaiting-retrain') {
+    return 'none';
+  }
+
+  const extraUsageStore = getExtraRecordingUsageStore(team);
+  const thresholdStore = getThresholdReducedStore(team);
+  const extraUsage = get(extraUsageStore);
+  const reducedUsage = get(thresholdStore);
+
+  if (!extraUsage[currentChallengeId]) {
+    extraUsageStore.set({
+      ...extraUsage,
+      [currentChallengeId]: true,
+    });
+    setTeamChallengeStatus(team, 'awaiting-retrain', currentChallengeId);
+    return 'request-extra-recording';
+  }
+
+  if (!reducedUsage[currentChallengeId]) {
+    thresholdStore.set({
+      ...reducedUsage,
+      [currentChallengeId]: true,
+    });
+    setTeamChallengeStatus(team, 'ready', currentChallengeId);
+    return 'lower-threshold';
+  }
+
+  setTeamChallengeStatus(team, 'ready', currentChallengeId);
+  return 'none';
+}
+
+export function notifyTrainingFinishedForGame() {
+  const teamAState = get(teamAChallengeState);
+  if (teamAState.status === 'awaiting-retrain') {
+    setTeamChallengeStatus('A', 'ready', getCurrentTeamChallengeId('A'));
+  }
+
+  const teamBState = get(teamBChallengeState);
+  if (teamBState.status === 'awaiting-retrain') {
+    setTeamChallengeStatus('B', 'ready', getCurrentTeamChallengeId('B'));
+  }
+
+  lastFailedTeamForRetrain.set(null);
 }
 
 export function getRaceWinner() {

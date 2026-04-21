@@ -19,7 +19,7 @@ import { modelTrainingInProgress } from '../../lib/stores/ApplicationState';
 import {
   GamePhase,
   jacdacGameMode,
-  resetRaceState,
+  notifyTrainingFinishedForGame,
   setGamePhase,
 } from '../../lib/stores/TeamGameStore';
 
@@ -74,8 +74,8 @@ export const trainBothTeamModels = async () => {
     await trainSelectedModel();
 
     if (get(jacdacGameMode)) {
-      resetRaceState();
-      setGamePhase(GamePhase.Paused);
+      notifyTrainingFinishedForGame();
+      setGamePhase(GamePhase.Playing);
     }
   } finally {
     modelTrainingInProgress.set(false);

@@ -11,7 +11,6 @@
     importStoredOrDefaultExampleDataset,
     saveCurrentAsExampleDataset,
   } from '../../pages/data/DataPage';
-  import { adminTestMode } from '../../lib/stores/TeamGameStore';
   import { stores } from '../../lib/stores/Stores';
 
   const accuracy = stores.getValidationResults().getAccuracy();
@@ -59,13 +58,5 @@
     {#if !onTrainingPage}
       <p class="text-xs text-slate-300">Kan kun bruges på Træn AI siden</p>
     {/if}
-
-    <button
-      type="button"
-      class="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
-      on:click={() => adminTestMode.update(value => !value)}>
-      {#if $adminTestMode}Admin: slået til{:else}Admin: slået fra{/if}
-    </button>
-    <p class="text-xs text-slate-400 text-center">Bruges til test uden micro:bits</p>
   </div>
 </div>
