@@ -35,7 +35,7 @@ class StaticConfiguration {
   public static readonly gestureNameMaxLength = 18;
 
   // Default required confidence level
-  public static readonly defaultRequiredConfidence = 0.8;
+  public static readonly defaultRequiredConfidence = 0.65;
 
   // Duration before assuming the microbit is outdated? (in milliseconds)
   public static readonly versionIdentificationTimeoutDuration = 4000;

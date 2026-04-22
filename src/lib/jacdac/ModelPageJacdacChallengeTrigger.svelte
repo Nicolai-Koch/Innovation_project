@@ -263,10 +263,14 @@
   async function flashResultColor(service: JDService | undefined, team: TeamKey, succeeded: boolean) {
     if (succeeded) {
       await setLedColor(service, 0, 220, 90);
-      await delay(550);
+      await delay(5000);
     } else {
-      await setLedColor(service, 220, 0, 0);
-      await delay(550);
+      for (let i = 0; i < 10; i++) {
+        await setLedColor(service, 220, 0, 0);
+        await delay(250);
+        await setLedColor(service, 0, 0, 0);
+        await delay(250);
+      }
     }
 
     const teamColor = getTeamColor(team);
@@ -364,6 +368,9 @@
 
     const action = requestTeamChallengeRetraining(team);
     if (action === 'request-extra-recording') {
+      const ledService = resolveTeamLedService(team, buttonService);
+      // Show waiting animation on the team's LED while navigating to retrain
+      void blinkTeamColor(ledService, team, 2);
       requestExtraRecordingForCurrentChallenge(team);
       return;
     }

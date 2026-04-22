@@ -25,6 +25,7 @@
   import ModelRegistry from '../domain/ModelRegistry';
   import { modelTrainingInProgress } from '../stores/ApplicationState';
   import {
+    activeTeam,
     classesPerRound,
     GamePhase,
     jacdacGameMode,
@@ -36,13 +37,19 @@
     teamColorPalette,
     type TeamKey,
   } from '../stores/TeamGameStore';
-  import { switchActiveTrainingTeam } from '../../pages/data/DataPage';
+  import {
+    getStoredTeamDatasetSnapshot,
+    switchActiveTrainingTeam,
+  } from '../../pages/data/DataPage';
 
   let knownDevices: JDDevice[] = [];
   let triggerInProgress = false;
   let unsubscribers: (() => void)[] = [];
   let lastTriggerAt = new Map<string, number>();
   const ledPixelCount = new Map<string, number>();
+  let waitingAnimationTimeout: ReturnType<typeof setTimeout> | undefined;
+  let waitingAnimationFrame = 0;
+  let waitingAnimationInFlight = false;
 
   function delay(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -300,6 +307,43 @@
     await service.register(LedReg.Pixels).sendSetPackedAsync([pixels], true);
   }
 
+  async function setWaitingRingLeds(
+    service: JDService | undefined,
+    darkLedIndex: number,
+    color: { r: number; g: number; b: number },
+  ) {
+    if (!service) return;
+
+    const count = await getLedPixelCount(service);
+    if (!count) return;
+
+    const activeLeds = Math.min(count, 8);
+    const safeDarkIndex = ((darkLedIndex % activeLeds) + activeLeds) % activeLeds;
+    const pixels = new Uint8Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      const isDark = i === safeDarkIndex;
+      pixels[i * 3] = isDark ? 0 : color.r;
+      pixels[i * 3 + 1] = isDark ? 0 : color.g;
+      pixels[i * 3 + 2] = isDark ? 0 : color.b;
+    }
+
+    await service.register(LedReg.Pixels).sendSetPackedAsync([pixels], true);
+  }
+
+  async function blinkTeamColorTwice(
+    service: JDService | undefined,
+    color: { r: number; g: number; b: number },
+  ) {
+    for (let i = 0; i < 2; i++) {
+      await setLedColor(service, color.r, color.g, color.b);
+      await delay(180);
+      await setLedColor(service, 0, 0, 0);
+      await delay(130);
+    }
+    await setLedColor(service, color.r, color.g, color.b);
+  }
+
   async function trainBothTeamsWithLedAnimation() {
     const ledA = resolveMappedTeamLedService('A');
     const ledB = resolveMappedTeamLedService('B');
@@ -342,6 +386,94 @@
     };
   }
 
+  function hasPendingRecordings() {
+    if (!$jacdacGameMode) {
+      return !hasEnoughDataToTrain();
+    }
+
+    return teamNeedsMoreRecordings('A') || teamNeedsMoreRecordings('B');
+  }
+
+  function teamNeedsMoreRecordings(team: TeamKey) {
+    if (!$jacdacGameMode) {
+      return !hasEnoughDataToTrain();
+    }
+
+    const snapshot = getStoredTeamDatasetSnapshot(team);
+    if (!snapshot || snapshot.length === 0) {
+      return true;
+    }
+
+    return snapshot.some(
+      gesture =>
+        gesture.recordings.length < StaticConfiguration.minNoOfRecordingsPerGesture,
+    );
+  }
+
+  async function runTrainingWaitingAnimationFrame() {
+    if (waitingAnimationInFlight) return;
+    waitingAnimationInFlight = true;
+
+    try {
+      if (!get(connected) || triggerInProgress || $modelTrainingInProgress) {
+        return;
+      }
+
+      if (!hasPendingRecordings()) {
+        const colorA = getTeamCountdownColor('A');
+        const colorB = getTeamCountdownColor('B');
+        await Promise.all([
+          setLedColor(resolveMappedTeamLedService('A'), colorA.r, colorA.g, colorA.b),
+          setLedColor(resolveMappedTeamLedService('B'), colorB.r, colorB.g, colorB.b),
+        ]);
+        return;
+      }
+
+      const ledA = resolveMappedTeamLedService('A');
+      const ledB = resolveMappedTeamLedService('B');
+      const colorA = getTeamCountdownColor('A');
+      const colorB = getTeamCountdownColor('B');
+
+      const teamANeedsMore = teamNeedsMoreRecordings('A');
+      const teamBNeedsMore = teamNeedsMoreRecordings('B');
+
+      await Promise.all([
+        teamANeedsMore
+          ? setWaitingRingLeds(ledA, waitingAnimationFrame, colorA)
+          : setLedColor(ledA, colorA.r, colorA.g, colorA.b),
+        teamBNeedsMore
+          ? setWaitingRingLeds(ledB, waitingAnimationFrame, colorB)
+          : setLedColor(ledB, colorB.r, colorB.g, colorB.b),
+      ]);
+
+      waitingAnimationFrame = (waitingAnimationFrame + 1) % 8;
+    } finally {
+      waitingAnimationInFlight = false;
+    }
+  }
+
+  function startTrainingWaitingAnimation() {
+    if (waitingAnimationTimeout) {
+      return;
+    }
+
+    const tick = async () => {
+      await runTrainingWaitingAnimationFrame();
+      waitingAnimationTimeout = setTimeout(() => {
+        void tick();
+      }, 220);
+    };
+
+    void tick();
+  }
+
+  function stopTrainingWaitingAnimation() {
+    if (waitingAnimationTimeout) {
+      clearTimeout(waitingAnimationTimeout);
+      waitingAnimationTimeout = undefined;
+    }
+  }
+
   function resolveTeamFromButtonService(buttonService: JDService): TeamKey | null {
     const label = getServiceLabel(buttonService);
     if (label.includes(gameSetupModuleMapping.teamA.button.toUpperCase())) {
@@ -370,7 +502,15 @@
     return play.id === buttonService.id;
   }
 
-  function handlePlayButtonPress() {
+  function handlePlayButtonPress(buttonService: JDService) {
+    const requestedContext = getRequestedExtraRecordingContext();
+    
+    // If we're in retrain mode (extra recording requested), trigger recording
+    if (requestedContext) {
+      void runLedAndRecord(buttonService, $activeTeam);
+      return;
+    }
+
     if (!$jacdacGameMode) {
       return;
     }
@@ -450,9 +590,14 @@
     if ($modelTrainingInProgress) return;
 
     const requestedExtraContext = getRequestedExtraRecordingContext();
+    const recordingTargetGesture = requestedExtraContext?.gesture ?? getNextGestureToRecord();
+    const recordingTargetGestureId = recordingTargetGesture?.getId();
+    const recordingCountBefore = recordingTargetGesture?.getRecordings().length ?? 0;
     const hasRecordingTarget = !!getNextGestureToRecord();
     const ledService = resolveTeamLedService(team, buttonService);
     const countdownColor = getTeamCountdownColor(team);
+    let recordingWasSuccessful = false;
+    const isRetrainMode = !!requestedExtraContext;
 
     if (!requestedExtraContext && hasEnoughDataToTrain()) {
       if ($jacdacGameMode) {
@@ -513,6 +658,20 @@
       await setLedColor(ledService, 255, 0, 0);
       await delay(650);
       await setLedColor(ledService, countdownColor.r, countdownColor.g, countdownColor.b);
+      recordingWasSuccessful = true;
+
+      if (recordingTargetGestureId !== undefined) {
+        const updatedGesture = stores
+          .getGestures()
+          .getGestures()
+          .find(gesture => gesture.getId() === recordingTargetGestureId);
+        const recordingCountAfter = updatedGesture?.getRecordings().length ?? recordingCountBefore;
+        const minRequired = StaticConfiguration.minNoOfRecordingsPerGesture;
+
+        if (recordingCountBefore < minRequired && recordingCountAfter >= minRequired) {
+          await blinkTeamColorTwice(ledService, countdownColor);
+        }
+      }
 
       if ($jacdacGameMode && hasEnoughDataForCurrentTeam()) {
         if (team === 'A') {
@@ -520,6 +679,15 @@
         } else {
           teamBTrainingComplete.set(true);
         }
+      }
+
+      // Auto-trigger retrain training if we just completed extra recording
+      if (isRetrainMode && recordingWasSuccessful) {
+        clearRequestedExtraRecording();
+        void (async () => {
+          await trainBothTeamsWithLedAnimation();
+          navigate(Paths.MODEL);
+        })();
       }
     } catch (e) {
       console.error('Jacdac data trigger failed:', e);
@@ -532,7 +700,7 @@
     if (triggerInProgress) return;
 
     if (isPlayButtonService(buttonService)) {
-      handlePlayButtonPress();
+      handlePlayButtonPress(buttonService);
       return;
     }
 
@@ -595,6 +763,8 @@
   }
 
   onMount(() => {
+    startTrainingWaitingAnimation();
+
     const unsubscribeDevices = jacdacDevices.subscribe((deviceList) => {
       knownDevices = [...deviceList];
       if (get(connected)) subscribeToButtons();
@@ -612,6 +782,7 @@
       unsubscribeDevices();
       unsubscribeConnected();
       cleanupSubscriptions();
+      stopTrainingWaitingAnimation();
     };
   });
 </script>

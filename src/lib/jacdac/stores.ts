@@ -182,6 +182,10 @@ export function installGameSetupJacdacController() {
     return ((value % modulo) + modulo) % modulo;
   }
 
+  function delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   function getServicesByClass(serviceClass: number) {
     return detectedDevices.flatMap(device =>
       device.services().filter(service => service.serviceClass === serviceClass)
@@ -250,6 +254,26 @@ export function installGameSetupJacdacController() {
     await setLedRingColor(ledService, color?.hex ?? null);
   }
 
+  async function blinkTeamLedTwice(team: TeamKey, ledService: JDService | undefined, colorId: string | null) {
+    if (!ledService || !colorId) {
+      return;
+    }
+
+    const color = teamColorPalette.find(entry => entry.id === colorId) ?? null;
+    if (!color) {
+      return;
+    }
+
+    for (let i = 0; i < 2; i += 1) {
+      await setLedRingColor(ledService, color.hex);
+      await delay(180);
+      await setLedRingColor(ledService, '#000000');
+      await delay(130);
+    }
+
+    await setLedRingColor(ledService, color.hex);
+  }
+
   function chooseTeamColorFromEncoder(team: TeamKey, rawPosition: number, ledService: JDService | undefined) {
     const paletteSize = teamColorPalette.length;
     let nextIndex = positiveModulo(rawPosition, paletteSize);
@@ -284,7 +308,7 @@ export function installGameSetupJacdacController() {
 
     const colorId = team === 'A' ? get(teamAColorId) : get(teamBColorId);
     const control = teamControlBindings.find(entry => entry.team === team);
-    void refreshTeamLed(team, control?.ledService, colorId);
+    void blinkTeamLedTwice(team, control?.ledService, colorId);
   }
 
   function handlePlayButtonPress() {

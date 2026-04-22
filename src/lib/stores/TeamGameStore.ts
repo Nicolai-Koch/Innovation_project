@@ -106,8 +106,8 @@ export const teamBThresholdReducedByClass = writable<Record<number, boolean>>({}
 export const lastFailedTeamForRetrain = writable<TeamKey | null>(null);
 
 export const teamRaceSequence: Record<TeamKey, number[]> = {
-  A: [0, 1, 2],
-  B: [3, 4, 5],
+  A: [0, 1, 2, 5, 4, 3],
+  B: [3, 4, 5, 2, 1, 0],
 };
 
 const teamALiveData = new MicrobitAccelerometerLiveData(
