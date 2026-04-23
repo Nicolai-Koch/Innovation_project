@@ -50,6 +50,7 @@
   let waitingAnimationTimeout: ReturnType<typeof setTimeout> | undefined;
   let waitingAnimationFrame = 0;
   let waitingAnimationInFlight = false;
+  let waitingAnimationEnabled = false;
 
   function delay(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -411,6 +412,7 @@
   }
 
   async function runTrainingWaitingAnimationFrame() {
+    if (!waitingAnimationEnabled) return;
     if (waitingAnimationInFlight) return;
     waitingAnimationInFlight = true;
 
@@ -453,12 +455,21 @@
   }
 
   function startTrainingWaitingAnimation() {
+    waitingAnimationEnabled = true;
     if (waitingAnimationTimeout) {
       return;
     }
 
     const tick = async () => {
+      if (!waitingAnimationEnabled) {
+        return;
+      }
       await runTrainingWaitingAnimationFrame();
+
+      if (!waitingAnimationEnabled) {
+        return;
+      }
+
       waitingAnimationTimeout = setTimeout(() => {
         void tick();
       }, 220);
@@ -468,6 +479,7 @@
   }
 
   function stopTrainingWaitingAnimation() {
+    waitingAnimationEnabled = false;
     if (waitingAnimationTimeout) {
       clearTimeout(waitingAnimationTimeout);
       waitingAnimationTimeout = undefined;
@@ -631,6 +643,7 @@
 
     if (triggerInProgress) return;
     triggerInProgress = true;
+    stopTrainingWaitingAnimation();
 
     const recordingDuration = getFeature<number>(Feature.RECORDING_DURATION);
     const countdownDuration = 3000;
@@ -693,6 +706,9 @@
       console.error('Jacdac data trigger failed:', e);
     } finally {
       triggerInProgress = false;
+      if (get(connected)) {
+        startTrainingWaitingAnimation();
+      }
     }
   }
 

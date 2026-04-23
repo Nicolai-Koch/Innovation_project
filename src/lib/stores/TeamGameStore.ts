@@ -78,8 +78,7 @@ export type TeamChallengeAction =
 
 export type TeamPlayButtonAction =
   | 'none'
-  | 'request-extra-recording'
-  | 'lower-threshold';
+  | 'request-extra-recording';
 
 export type TeamChallengeState = {
   status: TeamChallengeStatus;
@@ -101,9 +100,12 @@ export const teamAChallengeState = writable<TeamChallengeState>(defaultChallenge
 export const teamBChallengeState = writable<TeamChallengeState>(defaultChallengeState());
 export const teamAExtraRecordingUsedByClass = writable<Record<number, boolean>>({});
 export const teamBExtraRecordingUsedByClass = writable<Record<number, boolean>>({});
-export const teamAThresholdReducedByClass = writable<Record<number, boolean>>({});
-export const teamBThresholdReducedByClass = writable<Record<number, boolean>>({});
+export const teamAFailedAttemptsByClass = writable<Record<number, number>>({});
+export const teamBFailedAttemptsByClass = writable<Record<number, number>>({});
 export const lastFailedTeamForRetrain = writable<TeamKey | null>(null);
+
+const thresholdDecreasePerFailedAttempt = 0.05;
+const minimumAdaptiveThreshold = 0.1;
 
 export const teamRaceSequence: Record<TeamKey, number[]> = {
   A: [0, 1, 2, 5, 4, 3],
@@ -270,8 +272,8 @@ export function resetRaceState() {
   teamBChallengeState.set(defaultChallengeState());
   teamAExtraRecordingUsedByClass.set({});
   teamBExtraRecordingUsedByClass.set({});
-  teamAThresholdReducedByClass.set({});
-  teamBThresholdReducedByClass.set({});
+  teamAFailedAttemptsByClass.set({});
+  teamBFailedAttemptsByClass.set({});
   lastFailedTeamForRetrain.set(null);
 }
 
@@ -314,13 +316,17 @@ function getExtraRecordingUsageStore(team: TeamKey) {
   return team === 'A' ? teamAExtraRecordingUsedByClass : teamBExtraRecordingUsedByClass;
 }
 
-function getThresholdReducedStore(team: TeamKey) {
-  return team === 'A' ? teamAThresholdReducedByClass : teamBThresholdReducedByClass;
+function getFailedAttemptsStore(team: TeamKey) {
+  return team === 'A' ? teamAFailedAttemptsByClass : teamBFailedAttemptsByClass;
 }
 
 function getThresholdForClass(team: TeamKey, challengeId: number) {
-  const reducedByClass = get(getThresholdReducedStore(team));
-  return reducedByClass[challengeId] ? 0.7 : StaticConfiguration.defaultRequiredConfidence;
+  const attemptsByClass = get(getFailedAttemptsStore(team));
+  const failedAttempts = attemptsByClass[challengeId] ?? 0;
+  const adaptiveThreshold =
+    StaticConfiguration.defaultRequiredConfidence - failedAttempts * thresholdDecreasePerFailedAttempt;
+
+  return Math.max(minimumAdaptiveThreshold, adaptiveThreshold);
 }
 
 function setTeamChallengeStatus(team: TeamKey, status: TeamChallengeStatus, challengeId: number | null) {
@@ -339,6 +345,10 @@ export function beginTeamChallengeCountdown(team: TeamKey, durationMs: number) {
   if (!challengeId) {
     return;
   }
+
+  // The team that just started countdown is the latest active attempt context.
+  // This decides which team (if any) is eligible for play-button retraining prompt.
+  lastFailedTeamForRetrain.set(team);
 
   getTeamChallengeStateStore(team).set({
     status: 'countdown',
@@ -384,6 +394,25 @@ export function markTeamChallengeAttemptSuccess(team: TeamKey) {
 
 export function markTeamChallengeAttemptFailed(team: TeamKey) {
   const challengeId = getCurrentTeamChallengeId(team);
+  if (challengeId) {
+    const extraUsageStore = getExtraRecordingUsageStore(team);
+    const extraUsage = get(extraUsageStore);
+
+    // Adaptive threshold only starts after a team has used an extra recording for this class.
+    if (!extraUsage[challengeId]) {
+      lastFailedTeamForRetrain.set(team);
+      setTeamChallengeStatus(team, 'failed', challengeId);
+      return;
+    }
+
+    const failedAttemptsStore = getFailedAttemptsStore(team);
+    const failedAttempts = get(failedAttemptsStore);
+    failedAttemptsStore.set({
+      ...failedAttempts,
+      [challengeId]: (failedAttempts[challengeId] ?? 0) + 1,
+    });
+  }
+
   lastFailedTeamForRetrain.set(team);
   setTeamChallengeStatus(team, 'failed', challengeId);
 }
@@ -422,6 +451,10 @@ export function requestTeamChallengeRetraining(team: TeamKey): TeamPlayButtonAct
     return 'none';
   }
 
+  if (get(lastFailedTeamForRetrain) !== team) {
+    return 'none';
+  }
+
   const currentChallengeId = getCurrentTeamChallengeId(team);
   if (!currentChallengeId) {
     return 'none';
@@ -432,10 +465,14 @@ export function requestTeamChallengeRetraining(team: TeamKey): TeamPlayButtonAct
     return 'none';
   }
 
+  // While retraining is pending, ignore repeated play-button presses.
+  // This prevents consuming additional retrain actions from button spam.
+  if (state.status === 'awaiting-retrain') {
+    return 'none';
+  }
+
   const extraUsageStore = getExtraRecordingUsageStore(team);
-  const thresholdStore = getThresholdReducedStore(team);
   const extraUsage = get(extraUsageStore);
-  const reducedUsage = get(thresholdStore);
 
   if (!extraUsage[currentChallengeId]) {
     extraUsageStore.set({
@@ -446,17 +483,18 @@ export function requestTeamChallengeRetraining(team: TeamKey): TeamPlayButtonAct
     return 'request-extra-recording';
   }
 
-  if (!reducedUsage[currentChallengeId]) {
-    thresholdStore.set({
-      ...reducedUsage,
-      [currentChallengeId]: true,
-    });
-    setTeamChallengeStatus(team, 'ready', currentChallengeId);
-    return 'lower-threshold';
+  // This team has already consumed its extra recording for the current class.
+  // Keep state unchanged so the user can still choose to retry with the team button.
+  return 'none';
+}
+
+export function canTeamRequestRetraining(team: TeamKey) {
+  if (get(lastFailedTeamForRetrain) !== team) {
+    return false;
   }
 
-  setTeamChallengeStatus(team, 'ready', currentChallengeId);
-  return 'none';
+  const state = get(getTeamChallengeStateStore(team));
+  return state.status === 'failed' || state.status === 'awaiting-retrain';
 }
 
 export function notifyTrainingFinishedForGame() {

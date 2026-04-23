@@ -13,6 +13,7 @@
   import StaticConfiguration from '../../../StaticConfiguration';
   import { stores } from '../../../lib/stores/Stores';
   import {
+    canTeamRequestRetraining,
     gamePhase,
     GamePhase,
     getCurrentTeamChallengeId,
@@ -57,13 +58,22 @@
   let refreshToken = 0;
   let predictionRows: PredictionRow[] = [];
   let orderedPredictionRows: PredictionRow[] = [];
-  let statusText = 'Venter paa start';
+  let statusText = 'Venter på start';
   let topPrediction: PredictionRow | undefined;
   let currentTargetClassIndex = 0;
   let activeThreshold = StaticConfiguration.defaultRequiredConfidence;
   let pollingInterval: ReturnType<typeof setInterval> | undefined;
   let predictionInFlight = false;
   let refreshQueued = false;
+
+  function playCorrectChallengeSound() {
+    try {
+      const sound = new Audio('sounds/Korrekt.m4a');
+      void sound.play().catch(() => undefined);
+    } catch {
+      // Ignore playback errors in browsers or environments without audio support.
+    }
+  }
 
   $: teamTitle = team === 'A' ? 'Hold A' : 'Hold B';
 
@@ -163,7 +173,7 @@
     activeThreshold = challengeState.threshold;
 
     if (!$model.isTrained) {
-      statusText = 'Model ikke traenet endnu';
+      statusText = 'Model ikke trænet endnu';
       return;
     }
 
@@ -189,9 +199,13 @@
       } else if (challengeState.status === 'passed') {
         statusText = 'Alle udfordringer klaret';
       } else if (challengeState.status === 'failed') {
-        statusText = 'Ikke klaret. Holdknap = prov igen, spilleknap = retrain';
+        statusText = canTeamRequestRetraining(team)
+          ? 'Ikke klaret. Holdknap = prøv igen, spilleknap = retrain'
+          : 'Ikke klaret. Holdknap = prøv igen';
       } else if (challengeState.status === 'awaiting-retrain') {
-        statusText = 'Tilfoej optagelse og traen igen paa Traen AI siden';
+        statusText = canTeamRequestRetraining(team)
+          ? 'Tilføj optagelse og træn igen på Træn AI siden'
+          : 'Afventer næste forsøg';
       } else {
         statusText = 'Tryk holdknap for countdown';
       }
@@ -202,7 +216,7 @@
       predictionInFlight = true;
       const bufferedData = getBufferedData(StaticConfiguration.pollingPredictionSampleSize);
       if (bufferedData.length === 0) {
-        statusText = 'Venter paa nok live-data';
+        statusText = 'Venter på nok live-data';
         return;
       }
 
@@ -244,19 +258,23 @@
         targetClassIndex !== null ? predictionRows[targetClassIndex]?.confidence ?? 0 : 0;
 
       if (targetClassIndex !== null && targetConfidence >= activeThreshold) {
+        const challengeState = get(team === 'A' ? teamAChallengeState : teamBChallengeState);
+        if (challengeState.status !== 'passed') {
+          playCorrectChallengeSound();
+        }
         markTeamChallengeAttemptSuccess(team);
         statusText = `Klaret! ${Math.round(targetConfidence * 100)}%`; 
         return;
       }
 
       const currentClassName = predictionRows[currentTargetClassIndex]?.name ?? '-';
-      statusText = `Maal klasse ${currentClassName} (>= ${Math.round(activeThreshold * 100)}%)`;
+      statusText = `Mål klasse ${currentClassName} (>= ${Math.round(activeThreshold * 100)}%)`;
     } catch {
       if (currentToken !== refreshToken) {
         return;
       }
 
-      statusText = 'Venter paa nok live-data';
+      statusText = 'Venter på nok live-data';
     } finally {
       predictionInFlight = false;
 
@@ -331,7 +349,7 @@
     <div>
       <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{teamTitle}</p>
       <h2 class="mt-1 text-2xl font-bold text-slate-900">{statusText}</h2>
-      <p class="mt-1 text-sm text-slate-600">Maales kun paa dette holds live-data.</p>
+      <p class="mt-1 text-sm text-slate-600">Måles kun på dette holds live-data.</p>
     </div>
     <div class="h-4 w-4 rounded-full" style={`background-color: ${accentColor};`} />
   </div>
@@ -348,7 +366,7 @@
         <p class="text-sm text-slate-600">
           {topPrediction
             ? `${Math.round(topPrediction.confidence * 100)}% sikker`
-            : 'Venter paa prediction'}
+            : 'Venter på prediction'}
         </p>
       </div>
 
@@ -375,7 +393,7 @@
               <p class="mt-1 text-xs text-slate-500">
                 {row.recordings} optagelser
                 {#if rowState === 'active'}
-                  . Maal: {Math.round(activeThreshold * 100)}%+
+                  . Mål: {Math.round(activeThreshold * 100)}%+
                 {:else if rowState === 'completed'}
                   . Klaret
                 {/if}

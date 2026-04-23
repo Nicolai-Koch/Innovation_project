@@ -10,6 +10,7 @@
   import LightSensorLedAutomation from './LightSensorLedAutomation.svelte';
   import MagnetSensorLedAutomation from './MagnetSensorLedAutomation.svelte';
   import StandardButton from '../../components/ui/buttons/StandardButton.svelte';
+  import { connectToBus } from './stores';
   import { startConnectionProcess } from '../stores/connectDialogStore';
   import Microbits from '../microbit-interfacing/Microbits';
 
@@ -69,6 +70,9 @@
       <h3>Forbindelser</h3>
       <div class="connection-grid">
         {#if !$connected}
+          <StandardButton onClick={connectToBus} color="primary">
+            Tilslut Jacdac igen
+          </StandardButton>
           <StandardButton onClick={startConnectionProcess}>
             Tilslut micro:bit
           </StandardButton>
