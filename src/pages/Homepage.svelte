@@ -53,8 +53,18 @@
     return cleanupGameSetupController;
   });
 
+  const playColorConflictSound = () => {
+    try {
+      const sound = new Audio('sounds/mistake.mp3');
+      void sound.play().catch(() => undefined);
+    } catch {
+      // Ignore playback errors in browsers or environments without audio support.
+    }
+  };
+
   const chooseTeamColor = (team: 'A' | 'B', colorId: string) => {
     if (isColorLockedForTeam(team, colorId)) {
+      playColorConflictSound();
       return;
     }
 

@@ -18,6 +18,7 @@
     lastFailedTeamForRetrain,
     markTeamChallengeAttemptFailed,
     requestTeamChallengeRetraining,
+    raceWinner,
     setGamePhase,
     teamAChallengeState,
     teamAColorId,
@@ -42,6 +43,9 @@
   let unsubscribers: (() => void)[] = [];
   let lastTriggerAt = new Map<string, number>();
   let retrainNavigationInProgress = false;
+  let lastCelebratedWinner: TeamKey | null = null;
+  let finishAnimationInProgress = false;
+  let countdownReadyAudioContext: AudioContext | undefined;
 
   function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -49,8 +53,62 @@
 
   function playFailedChallengeSound() {
     try {
-      const sound = new Audio('sounds/Ikke%20korrekt%20udført%20klasse.m4a');
+      const sound = new Audio('sounds/Ikke%20korrekt%20udf%C3%B8rt%20klasse.m4a');
       void sound.play().catch(() => undefined);
+    } catch {
+      // Ignore playback errors in browsers or environments without audio support.
+    }
+  }
+
+  function playWinnerSound() {
+    try {
+      const sound = new Audio('sounds/congratulations.wav');
+      void sound.play().catch(() => undefined);
+    } catch {
+      // Ignore playback errors in browsers or environments without audio support.
+    }
+  }
+
+  function playRaceCountdownSound(countdownDurationMs: number) {
+    try {
+      const AudioContextCtor =
+        globalThis.AudioContext ??
+        (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextCtor) {
+        return;
+      }
+
+      countdownReadyAudioContext ??= new AudioContextCtor();
+      const ctx = countdownReadyAudioContext;
+      if (ctx.state === 'suspended') {
+        void ctx.resume();
+      }
+
+      const start = ctx.currentTime + 0.01;
+      const spacing = countdownDurationMs / 3000;
+      const beepTimes = [0, 1, 2, 3].map(step => start + step * spacing);
+
+      const scheduleBeep = (when: number, frequency: number, duration: number, volume: number) => {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(frequency, when);
+
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.exponentialRampToValueAtTime(volume, when + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start(when);
+        oscillator.stop(when + duration + 0.01);
+      };
+
+      scheduleBeep(beepTimes[0], 760, 0.11, 0.12);
+      scheduleBeep(beepTimes[1], 760, 0.11, 0.12);
+      scheduleBeep(beepTimes[2], 760, 0.11, 0.12);
+      scheduleBeep(beepTimes[3], 1150, 0.2, 0.18);
     } catch {
       // Ignore playback errors in browsers or environments without audio support.
     }
@@ -64,6 +122,11 @@
     ledServiceByTeam.clear();
     ledAnimationTokenByService.clear();
     retrainNavigationInProgress = false;
+    finishAnimationInProgress = false;
+  }
+
+  function getOpposingTeam(team: TeamKey): TeamKey {
+    return team === 'A' ? 'B' : 'A';
   }
 
   function beginLedAnimation(service: JDService | undefined) {
@@ -428,6 +491,59 @@
     await setLedColor(service, teamColor.r, teamColor.g, teamColor.b, token);
   }
 
+  async function flashRaceFinishedResult(winner: TeamKey) {
+    if (finishAnimationInProgress) {
+      return;
+    }
+
+    finishAnimationInProgress = true;
+    try {
+      playWinnerSound();
+      buildTeamLedMap();
+
+      const loser = getOpposingTeam(winner);
+      const winnerLed = ledServiceByTeam.get(winner);
+      const loserLed = ledServiceByTeam.get(loser);
+      const winnerToken = beginLedAnimation(winnerLed);
+      const loserToken = beginLedAnimation(loserLed);
+
+      for (let i = 0; i < 10; i++) {
+        await Promise.all([
+          setLedColor(winnerLed, 0, 220, 90, winnerToken),
+          setLedColor(loserLed, 220, 0, 0, loserToken),
+        ]);
+        await delay(250);
+        await Promise.all([
+          setLedColor(winnerLed, 0, 0, 0, winnerToken),
+          setLedColor(loserLed, 0, 0, 0, loserToken),
+        ]);
+        await delay(250);
+      }
+
+      await Promise.all([
+        setLedColor(winnerLed, 0, 220, 90, winnerToken),
+        setLedColor(loserLed, 220, 0, 0, loserToken),
+      ]);
+    } finally {
+      finishAnimationInProgress = false;
+    }
+  }
+
+  $: {
+    if (lastCelebratedWinner !== null && $gamePhase !== GamePhase.Finished) {
+      lastCelebratedWinner = null;
+    }
+  }
+
+  $: {
+    if ($gamePhase === GamePhase.Finished && !!$raceWinner) {
+      if (lastCelebratedWinner !== $raceWinner) {
+        lastCelebratedWinner = $raceWinner;
+        void flashRaceFinishedResult($raceWinner);
+      }
+    }
+  }
+
   async function runChallengeWindow(team: TeamKey, buttonService: JDService) {
     if (teamBusy.get(team)) {
       return;
@@ -441,6 +557,7 @@
     try {
       beginTeamChallengeCountdown(team, countdownMs);
       await setLedColor(ledService, 0, 0, 0, animationToken);
+      playRaceCountdownSound(countdownMs);
 
       for (let litLeds = 8; litLeds > 0; litLeds--) {
         await setCountdownLeds(ledService, litLeds, teamColor, animationToken);
@@ -470,7 +587,9 @@
       }
 
       const stateAfterWindow = get(team === 'A' ? teamAChallengeState : teamBChallengeState);
-      await flashResultColor(ledService, team, stateAfterWindow.status === 'passed', animationToken);
+      const didSucceed =
+        stateAfterWindow.status === 'ready' || stateAfterWindow.status === 'passed';
+      await flashResultColor(ledService, team, didSucceed, animationToken);
     } finally {
       teamBusy.set(team, false);
       const finalColor = getTeamColor(team);
@@ -493,10 +612,7 @@
       .getGestures()
       .find(item => item.getId() === challengeId);
     const currentTarget = gesture?.getRecordings().length ?? 0;
-    const trainingTeam: TeamKey = challengeId <= 3 ? 'A' : 'B';
-
-    switchActiveTrainingTeam(trainingTeam);
-    requestExtraRecordingForGesture(challengeId, currentTarget + 1);
+    requestExtraRecordingForGesture(challengeId, currentTarget + 1, team);
     navigate(Paths.DATA);
   }
 

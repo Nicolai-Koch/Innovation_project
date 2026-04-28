@@ -10,6 +10,7 @@
   import {
     hasSomeRecordingData,
     loadTeamDatasetSnapshot,
+    loadCombinedTeamDatasetSnapshot,
     resetAllTeamTrainingData,
     saveTeamDatasetSnapshot,
     switchActiveTrainingTeam,
@@ -17,12 +18,22 @@
   import DataPageNoData from './data/DataPageNoData.svelte';
   import DataPageWithData from './data/DataPageWithData.svelte';
   import DataPageJacdacRecordTrigger from '../lib/jacdac/DataPageJacdacRecordTrigger.svelte';
-  import { activeTeam, jacdacGameMode, type TeamKey } from '../lib/stores/TeamGameStore';
+  import {
+    activeTeam,
+    getTeamLiveDataSource,
+    jacdacGameMode,
+    type TeamKey,
+  } from '../lib/stores/TeamGameStore';
+  import { requestedExtraRecordingRequest } from '../lib/stores/ExtraRecordingStore';
 
   const gestures = stores.getGestures();
   let hasLoadedTeamData = false;
+  let isCombinedRetrainView = false;
 
   const showTeam = (team: TeamKey) => {
+    if (isCombinedRetrainView) {
+      return;
+    }
     switchActiveTrainingTeam(team);
   };
 
@@ -33,14 +44,26 @@
   onMount(() => {
     jacdacGameMode.set(true);
     if ($jacdacGameMode) {
-      loadTeamDatasetSnapshot($activeTeam);
+      if ($requestedExtraRecordingRequest) {
+        loadCombinedTeamDatasetSnapshot();
+        activeTeam.set($requestedExtraRecordingRequest.team);
+        stores.setLiveData(getTeamLiveDataSource($requestedExtraRecordingRequest.team));
+        isCombinedRetrainView = true;
+      } else {
+        loadTeamDatasetSnapshot($activeTeam);
+      }
       hasLoadedTeamData = true;
     }
   });
 
   $: if ($jacdacGameMode && hasLoadedTeamData) {
     $gestures;
-    saveTeamDatasetSnapshot($activeTeam);
+    if (isCombinedRetrainView) {
+      saveTeamDatasetSnapshot('A');
+      saveTeamDatasetSnapshot('B');
+    } else {
+      saveTeamDatasetSnapshot($activeTeam);
+    }
   }
 </script>
 
@@ -85,6 +108,11 @@
           Ryd alle optagelser (begge hold)
         </button>
       </div>
+      {#if isCombinedRetrainView}
+        <p class="mt-2 text-sm text-slate-600">
+          Retræning er åben i samlet visning, så begge hold kan tilføje optagelser til alle klasser.
+        </p>
+      {/if}
     </div>
   {/if}
 

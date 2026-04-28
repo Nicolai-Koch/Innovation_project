@@ -4,25 +4,29 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { stores } from '../../lib/stores/Stores';
+import { get, readable } from 'svelte/store';
 import exampleDataset from '../../assets/exampleDataset.json';
 import { t } from '../../i18n';
-import { get, readable } from 'svelte/store';
+import type { RecordingData } from '../../lib/domain/RecordingData';
 import type { GestureData } from '../../lib/domain/stores/gesture/Gesture';
 import type { PersistedGestureData } from '../../lib/domain/stores/gesture/Gestures';
+import { stores } from '../../lib/stores/Stores';
 import {
   activeTeam,
   getTeamLiveDataSource,
   jacdacGameMode,
   markTeamTrainingComplete,
+  setActiveTeam,
   type TeamKey,
 } from '../../lib/stores/TeamGameStore';
-import StaticConfiguration from '../../StaticConfiguration';
-import type { RecordingData } from '../../lib/domain/RecordingData';
 import { alertUser } from '../../lib/stores/uiStore';
+import StaticConfiguration from '../../StaticConfiguration';
 
 const customExampleDatasetStorageKey = 'custom-example-dataset-v1';
 const teamDatasetStoragePrefix = 'team-gesture-dataset-v1-';
+const hiddenStillRecordingsStorageKey = 'hidden-still-recordings-v1';
+const hiddenStillLockedStorageKey = 'hidden-still-recordings-locked-v1';
+
 const TEAM_CLASS_IDS: Record<TeamKey, number[]> = {
   A: [1, 2, 3],
   B: [4, 5, 6],
@@ -63,28 +67,30 @@ function normalizeTeamDatasetSnapshot(
   team: TeamKey,
   snapshot: PersistedGestureData[] | null,
 ): PersistedGestureData[] {
-  const allowedClassIds = TEAM_CLASS_IDS[team];
-  const existingByClassId = new Map<number, PersistedGestureData>();
+  const fallback = createEmptyGesturesForTeam(team);
+  if (!snapshot) {
+    return fallback;
+  }
 
-  (snapshot ?? []).forEach(gesture => {
+  const byClassId = new Map<number, PersistedGestureData>();
+  snapshot.forEach(gesture => {
     const classId = resolveClassIdFromGesture(gesture);
-    if (!classId || !allowedClassIds.includes(classId)) {
+    if (classId == null || !TEAM_CLASS_IDS[team].includes(classId)) {
       return;
     }
 
-    existingByClassId.set(classId, {
-      ...gesture,
+    byClassId.set(classId, {
       ID: classId,
-      name: classId.toString(),
+      name: gesture.name || classId.toString(),
+      recordings: Array.isArray(gesture.recordings) ? gesture.recordings : [],
+      output: gesture.output ?? {},
       color:
-        gesture.color ||
+        gesture.color ??
         StaticConfiguration.gestureColors[(classId - 1) % StaticConfiguration.gestureColors.length],
     });
   });
 
-  return allowedClassIds.map(classId => {
-    return existingByClassId.get(classId) ?? createGestureForClass(classId);
-  });
+  return TEAM_CLASS_IDS[team].map(classId => byClassId.get(classId) ?? createGestureForClass(classId));
 }
 
 function serializeCurrentGestures(): PersistedGestureData[] {
@@ -100,6 +106,18 @@ function serializeCurrentGestures(): PersistedGestureData[] {
     }));
 }
 
+function hasEnoughDataForTraining(
+  gestures: Array<{ recordings: RecordingData[] }>,
+  requiredCount: number,
+): boolean {
+  return (
+    gestures.length >= requiredCount &&
+    gestures.every(
+      gesture => gesture.recordings.length >= StaticConfiguration.minNoOfRecordingsPerGesture,
+    )
+  );
+}
+
 export function getStoredTeamDatasetSnapshot(team: TeamKey): PersistedGestureData[] | null {
   const stored = localStorage.getItem(getTeamDatasetStorageKey(team));
   if (!stored) {
@@ -112,20 +130,6 @@ export function getStoredTeamDatasetSnapshot(team: TeamKey): PersistedGestureDat
   } catch {
     return null;
   }
-}
-
-function hasEnoughDataForTraining(
-  gestures: Array<{ recordings: RecordingData[] }>,
-  requiredCount: number,
-): boolean {
-
-  return (
-    gestures.length >= requiredCount &&
-    gestures.every(
-      gesture =>
-        gesture.recordings.length >= StaticConfiguration.minNoOfRecordingsPerGesture,
-    )
-  );
 }
 
 export const importExampleDataset = () => {
@@ -151,8 +155,30 @@ export const saveCurrentAsExampleDataset = () => {
   localStorage.setItem(customExampleDatasetStorageKey, JSON.stringify(snapshot));
 };
 
+export const importStoredOrDefaultExampleDataset = () => {
+  const gestures = stores.getGestures();
+  const availableAxes = stores.getAvailableAxes();
+
+  const stored = localStorage.getItem(customExampleDatasetStorageKey);
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored) as PersistedGestureData[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        gestures.importFrom(parsed);
+        availableAxes.loadFromGestures();
+        return;
+      }
+    } catch {
+      // Fall back to default dataset on malformed custom snapshot.
+    }
+  }
+
+  importExampleDataset();
+};
+
 export const saveTeamDatasetSnapshot = (team: TeamKey) => {
   const snapshot = normalizeTeamDatasetSnapshot(team, serializeCurrentGestures());
+
   localStorage.setItem(getTeamDatasetStorageKey(team), JSON.stringify(snapshot));
   markTeamTrainingComplete(team, hasEnoughDataForTraining(snapshot, TEAM_CLASS_IDS[team].length));
 };
@@ -199,7 +225,7 @@ export const switchActiveTrainingTeam = (nextTeam: TeamKey) => {
   }
 
   saveTeamDatasetSnapshot(previousTeam);
-  activeTeam.set(nextTeam);
+  setActiveTeam(nextTeam);
   loadTeamDatasetSnapshot(nextTeam);
   stores.setLiveData(getTeamLiveDataSource(nextTeam));
 };
@@ -222,28 +248,48 @@ export const resetAllTeamTrainingData = () => {
   stores.setLiveData(getTeamLiveDataSource(currentTeam));
 };
 
-
-
-export const importStoredOrDefaultExampleDataset = () => {
-  const gestures = stores.getGestures();
-  const availableAxes = stores.getAvailableAxes();
-
-  const stored = localStorage.getItem(customExampleDatasetStorageKey);
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored) as PersistedGestureData[];
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        gestures.importFrom(parsed);
-        availableAxes.loadFromGestures();
-        return;
-      }
-    } catch {
-      // Fall back to default dataset on malformed custom snapshot.
-    }
+export function getHiddenStillRecordings(): RecordingData[] {
+  const stored = localStorage.getItem(hiddenStillRecordingsStorageKey);
+  if (!stored) {
+    return [];
   }
 
-  importExampleDataset();
-};
+  try {
+    const parsed = JSON.parse(stored) as RecordingData[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function isHiddenStillRecordingsLocked(): boolean {
+  return localStorage.getItem(hiddenStillLockedStorageKey) === 'true';
+}
+
+function saveHiddenStillRecordings(recordings: RecordingData[]) {
+  localStorage.setItem(hiddenStillRecordingsStorageKey, JSON.stringify(recordings));
+}
+
+export function addHiddenStillRecording(recording: RecordingData): RecordingData[] {
+  const recordings = getHiddenStillRecordings();
+  const nextRecordings = [...recordings, recording];
+  saveHiddenStillRecordings(nextRecordings);
+  return nextRecordings;
+}
+
+export function removeHiddenStillRecording(recordingId: number): RecordingData[] {
+  const nextRecordings = getHiddenStillRecordings().filter(recording => recording.ID !== recordingId);
+  saveHiddenStillRecordings(nextRecordings);
+  return nextRecordings;
+}
+
+export function lockHiddenStillRecordings() {
+  localStorage.setItem(hiddenStillLockedStorageKey, 'true');
+}
+
+export function unlockHiddenStillRecordings() {
+  localStorage.setItem(hiddenStillLockedStorageKey, 'false');
+}
 
 export const hasSomeRecordingData = readable(false, set => {
   const unsubscribe = stores.getGestures().subscribe(gestures => {

@@ -20,6 +20,7 @@
   import { t } from '../../../i18n';
   import type Gesture from '../../../lib/domain/stores/gesture/Gesture';
   import { navigate, Paths } from '../../../router/Router';
+  import { activeTeam } from '../../../lib/stores/TeamGameStore';
   import { chosenGesture } from '../../../lib/stores/uiStore';
   import {
     requestExtraRecordingForGesture,
@@ -53,7 +54,7 @@
         ? Math.max(request.targetRecordings, gesture.getRecordings().length)
         : gesture.getRecordings().length;
 
-    requestExtraRecordingForGesture(gesture.getId(), currentTarget + 1);
+    requestExtraRecordingForGesture(gesture.getId(), currentTarget + 1, get(activeTeam));
     chosenGesture.set(gesture);
     navigate(Paths.DATA);
   };

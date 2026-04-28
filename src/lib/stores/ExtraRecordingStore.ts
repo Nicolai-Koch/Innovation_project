@@ -5,10 +5,12 @@
  */
 
 import { writable } from 'svelte/store';
+import type { TeamKey } from './TeamGameStore';
 
 export type ExtraRecordingRequest = {
   gestureId: number;
   targetRecordings: number;
+  team: TeamKey;
 };
 
 export const requestedExtraRecordingRequest = writable<ExtraRecordingRequest | null>(null);
@@ -16,10 +18,12 @@ export const requestedExtraRecordingRequest = writable<ExtraRecordingRequest | n
 export const requestExtraRecordingForGesture = (
   gestureId: number,
   targetRecordings: number,
+  team: TeamKey,
 ) => {
   requestedExtraRecordingRequest.set({
     gestureId,
     targetRecordings,
+    team,
   });
 };
 

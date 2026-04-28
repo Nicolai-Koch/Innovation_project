@@ -54,6 +54,15 @@ export const connected = writable(false);
 export const devices = writable<JDDevice[]>([]);
 export const error = writable<string | null>(null);
 
+function playColorConflictSound() {
+  try {
+    const sound = new Audio('sounds/mistake.mp3');
+    void sound.play().catch(() => undefined);
+  } catch {
+    // Ignore playback errors in browsers or environments without audio support.
+  }
+}
+
 function getVisibleDevices(currentBus: JDBus): JDDevice[] {
   // Show only real announced, non-infrastructure devices.
   // This avoids showing the built-in simulator/infrastructure pseudo-device.
@@ -302,6 +311,7 @@ export function installGameSetupJacdacController() {
 
     const didConfirm = confirmTeamColor(team);
     if (!didConfirm) {
+      playColorConflictSound();
       snackbar.sendMessage('Farven er allerede låst af det andet hold. Vælg en anden farve.');
       return;
     }

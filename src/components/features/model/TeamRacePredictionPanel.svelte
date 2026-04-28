@@ -68,7 +68,7 @@
 
   function playCorrectChallengeSound() {
     try {
-      const sound = new Audio('sounds/Korrekt.m4a');
+      const sound = new Audio('sounds/Det%20var%20ikke%20s%C3%A5%20sv%C3%A6rt%20.m4a');
       void sound.play().catch(() => undefined);
     } catch {
       // Ignore playback errors in browsers or environments without audio support.

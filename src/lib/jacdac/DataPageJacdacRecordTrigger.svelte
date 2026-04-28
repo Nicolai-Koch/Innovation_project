@@ -51,9 +51,105 @@
   let waitingAnimationFrame = 0;
   let waitingAnimationInFlight = false;
   let waitingAnimationEnabled = false;
+  let countdownReadyAudioContext: AudioContext | undefined;
 
   function delay(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function playRaceCountdownSound(countdownDurationMs: number) {
+    try {
+      const AudioContextCtor =
+        globalThis.AudioContext ??
+        (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextCtor) {
+        return;
+      }
+
+      countdownReadyAudioContext ??= new AudioContextCtor();
+      const ctx = countdownReadyAudioContext;
+      if (ctx.state === 'suspended') {
+        void ctx.resume();
+      }
+
+      const start = ctx.currentTime + 0.01;
+      const spacing = countdownDurationMs / 3000;
+      const beepTimes = [0, 1, 2, 3].map(step => start + step * spacing);
+
+      const scheduleBeep = (when: number, frequency: number, duration: number, volume: number) => {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(frequency, when);
+
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.exponentialRampToValueAtTime(volume, when + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start(when);
+        oscillator.stop(when + duration + 0.01);
+      };
+
+      scheduleBeep(beepTimes[0], 760, 0.11, 0.12);
+      scheduleBeep(beepTimes[1], 760, 0.11, 0.12);
+      scheduleBeep(beepTimes[2], 760, 0.11, 0.12);
+      scheduleBeep(beepTimes[3], 1150, 0.2, 0.18);
+    } catch {
+      // Ignore playback errors in browsers or environments without audio support.
+    }
+  }
+
+  function playClassCompletedSound() {
+    try {
+      const AudioContextCtor =
+        globalThis.AudioContext ??
+        (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextCtor) {
+        return;
+      }
+
+      countdownReadyAudioContext ??= new AudioContextCtor();
+      const ctx = countdownReadyAudioContext;
+      if (ctx.state === 'suspended') {
+        void ctx.resume();
+      }
+
+      const start = ctx.currentTime + 0.01;
+      const scheduleBeep = (when: number, frequency: number, duration: number, volume: number) => {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(frequency, when);
+
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.exponentialRampToValueAtTime(volume, when + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start(when);
+        oscillator.stop(when + duration + 0.01);
+      };
+
+      // Beep-bop: short high beep followed by lower bop.
+      scheduleBeep(start, 980, 0.1, 0.13);
+      scheduleBeep(start + 0.14, 620, 0.14, 0.14);
+    } catch {
+      // Ignore playback errors in browsers or environments without audio support.
+    }
+  }
+
+  function playDataFilledSound() {
+    try {
+      const sound = new Audio('sounds/Det%20data%20smager%20godt%20.m4a');
+      void sound.play().catch(() => undefined);
+    } catch {
+      // Ignore playback errors in browsers or environments without audio support.
+    }
   }
 
   function cleanupSubscriptions() {
@@ -150,6 +246,7 @@
     return {
       gesture,
       targetRecordings: request.targetRecordings,
+      team: request.team,
     };
   }
 
@@ -519,7 +616,7 @@
     
     // If we're in retrain mode (extra recording requested), trigger recording
     if (requestedContext) {
-      void runLedAndRecord(buttonService, $activeTeam);
+      void runLedAndRecord(buttonService, requestedContext.team);
       return;
     }
 
@@ -647,8 +744,13 @@
 
     const recordingDuration = getFeature<number>(Feature.RECORDING_DURATION);
     const countdownDuration = 3000;
+    const dataWasCompleteBefore = $jacdacGameMode
+      ? $teamATrainingComplete && $teamBTrainingComplete
+      : hasEnoughDataToTrain();
 
     try {
+      playRaceCountdownSound(countdownDuration);
+
       // Show a full white ring and turn off one LED at a time over 7 seconds.
       for (let litLeds = 8; litLeds > 0; litLeds--) {
         await setCountdownLeds(ledService, litLeds, countdownColor);
@@ -682,6 +784,7 @@
         const minRequired = StaticConfiguration.minNoOfRecordingsPerGesture;
 
         if (recordingCountBefore < minRequired && recordingCountAfter >= minRequired) {
+          playClassCompletedSound();
           await blinkTeamColorTwice(ledService, countdownColor);
         }
       }
@@ -691,6 +794,15 @@
           teamATrainingComplete.set(true);
         } else {
           teamBTrainingComplete.set(true);
+        }
+
+        if (!dataWasCompleteBefore && get(teamATrainingComplete) && get(teamBTrainingComplete)) {
+          playDataFilledSound();
+        }
+      } else {
+        const dataIsCompleteNow = hasEnoughDataToTrain();
+        if (!dataWasCompleteBefore && dataIsCompleteNow) {
+          playDataFilledSound();
         }
       }
 

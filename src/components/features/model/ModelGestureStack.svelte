@@ -22,6 +22,7 @@
   import { navigate, Paths } from '../../../router/Router';
   import Microbits from '../../../lib/microbit-interfacing/Microbits';
   import { stores } from '../../../lib/stores/Stores';
+  import { activeTeam } from '../../../lib/stores/TeamGameStore';
   import { chosenGesture } from '../../../lib/stores/uiStore';
   import StaticConfiguration from '../../../StaticConfiguration';
   import {
@@ -195,7 +196,7 @@
         ? Math.max(request.targetRecordings, gesture.getRecordings().length)
         : gesture.getRecordings().length;
 
-    requestExtraRecordingForGesture(gesture.getId(), currentTarget + 1);
+    requestExtraRecordingForGesture(gesture.getId(), currentTarget + 1, get(activeTeam));
     chosenGesture.set(gesture);
     navigate(Paths.DATA);
   };

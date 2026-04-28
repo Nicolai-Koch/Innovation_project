@@ -172,7 +172,7 @@
           </div>
         </div>
       </div>
-    {:else}
+    {:else if $gamePhase !== GamePhase.Playing}
       <div class="m-auto w-11/12 space-y-3 text-left">
         {#each teamGameData as teamData (teamData.team)}
           <div class="rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-sm">
@@ -198,8 +198,6 @@
               <p class="mt-2 text-xs font-semibold text-green-700">
                 Vinder: Hold {$raceWinner}
               </p>
-            {:else if $gamePhase === GamePhase.Playing}
-              <p class="mt-2 text-xs font-semibold text-slate-600">Spillet kører</p>
             {:else}
               <p class="mt-2 text-xs font-semibold text-slate-600">Afventer start</p>
             {/if}

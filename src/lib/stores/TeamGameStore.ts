@@ -107,6 +107,35 @@ export const lastFailedTeamForRetrain = writable<TeamKey | null>(null);
 const thresholdDecreasePerFailedAttempt = 0.05;
 const minimumAdaptiveThreshold = 0.1;
 
+function playBothColorsSelectedSound() {
+  try {
+    const sound = new Audio('sounds/Begge%20farver%20er%20valgt%20.m4a');
+    void sound.play().catch(() => undefined);
+  } catch {
+    // Ignore playback errors in browsers or environments without audio support.
+  }
+}
+
+function playTeamColorSelectionSound(colorId: string) {
+  try {
+    const soundPath =
+      colorId === 'green'
+        ? 'sounds/Gr%C3%B8n%20.m4a'
+        : colorId === 'orange'
+          ? 'sounds/Orange%20.m4a'
+          : null;
+
+    if (!soundPath) {
+      return;
+    }
+
+    const sound = new Audio(soundPath);
+    void sound.play().catch(() => undefined);
+  } catch {
+    // Ignore playback errors in browsers or environments without audio support.
+  }
+}
+
 export const teamRaceSequence: Record<TeamKey, number[]> = {
   A: [0, 1, 2, 5, 4, 3],
   B: [3, 4, 5, 2, 1, 0],
@@ -197,11 +226,26 @@ export function confirmTeamColor(team: 'A' | 'B') {
     return false;
   }
 
+  const otherTeamConfirmed = team === 'A' ? get(teamBConfirmed) : get(teamAConfirmed);
+
   if (team === 'A') {
     teamAConfirmed.set(true);
+    if (colorId === 'green' || colorId === 'orange') {
+      playTeamColorSelectionSound(colorId);
+    }
+    if (otherTeamConfirmed) {
+      playBothColorsSelectedSound();
+    }
     return true;
   }
+
   teamBConfirmed.set(true);
+  if (colorId === 'green' || colorId === 'orange') {
+    playTeamColorSelectionSound(colorId);
+  }
+  if (otherTeamConfirmed) {
+    playBothColorsSelectedSound();
+  }
   return true;
 }
 
