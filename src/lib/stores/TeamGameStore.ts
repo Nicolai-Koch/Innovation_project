@@ -78,7 +78,8 @@ export type TeamChallengeAction =
 
 export type TeamPlayButtonAction =
   | 'none'
-  | 'request-extra-recording';
+  | 'request-extra-recording'
+  | 'skip-challenge';
 
 export type TeamChallengeState = {
   status: TeamChallengeStatus;
@@ -527,9 +528,21 @@ export function requestTeamChallengeRetraining(team: TeamKey): TeamPlayButtonAct
     return 'request-extra-recording';
   }
 
-  // This team has already consumed its extra recording for the current class.
-  // Keep state unchanged so the user can still choose to retry with the team button.
-  return 'none';
+  // The team already used the extra recording for this class.
+  // A second play-button press now skips this class and moves to the next one.
+  advanceTeamRaceProgress(team);
+
+  const nextChallengeId = getCurrentTeamChallengeId(team);
+  if (!nextChallengeId) {
+    setTeamChallengeStatus(team, 'passed', currentChallengeId);
+    setRaceWinner(team);
+    lastFailedTeamForRetrain.set(null);
+    return 'skip-challenge';
+  }
+
+  setTeamChallengeStatus(team, 'ready', nextChallengeId);
+  lastFailedTeamForRetrain.set(null);
+  return 'skip-challenge';
 }
 
 export function canTeamRequestRetraining(team: TeamKey) {

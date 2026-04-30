@@ -665,6 +665,13 @@
       return true;
     }
 
+    if (action === 'skip-challenge') {
+      const ledService = resolveTeamLedService(team, buttonService);
+      const animationToken = beginLedAnimation(ledService);
+      void blinkTeamColor(ledService, team, 1, animationToken);
+      return true;
+    }
+
     return false;
   }
 

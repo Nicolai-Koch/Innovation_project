@@ -200,7 +200,7 @@
         statusText = 'Alle udfordringer klaret';
       } else if (challengeState.status === 'failed') {
         statusText = canTeamRequestRetraining(team)
-          ? 'Ikke klaret. Holdknap = prøv igen, spilleknap = retrain'
+          ? 'Ikke klaret. Holdknap = prøv igen, spilleknap = ekstra optagelse eller skip'
           : 'Ikke klaret. Holdknap = prøv igen';
       } else if (challengeState.status === 'awaiting-retrain') {
         statusText = canTeamRequestRetraining(team)
