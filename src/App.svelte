@@ -58,6 +58,7 @@
   import IncompatiblePlatformView from './components/layout/IncompatiblePlatformView.svelte';
   import OverlayView from './components/layout/OverlayView.svelte';
   import SideBarMenuView from './components/layout/SideBarMenuView.svelte';
+  import PlayButtonRingTrigger from './lib/jacdac/PlayButtonRingTrigger.svelte';
   import PageContentView from './components/layout/PageContentView.svelte';
   import { stores } from './lib/stores/Stores';
   import { DeviceRequestStates } from './lib/domain/Devices';
@@ -79,6 +80,7 @@
 
 <Router>
   <SnackbarView />
+  <PlayButtonRingTrigger />
   {#if !$compatibility.platformAllowed}
     <!-- Denies mobile users access to the platform -->
     <IncompatiblePlatformView />

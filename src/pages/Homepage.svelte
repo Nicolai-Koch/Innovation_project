@@ -11,23 +11,16 @@
   import ConnectDialogContainer from '../components/features/connection-prompt/ConnectDialogContainer.svelte';
   import StandardButton from '../components/ui/buttons/StandardButton.svelte';
   import { startConnectionProcess } from '../lib/stores/connectDialogStore';
-  import { Paths, navigate } from '../router/Router';
   import { isLoading } from '../lib/stores/ApplicationState';
   import {
     getTeamColorIndexById,
     isColorLockedForTeam,
-    startCompetitiveRound,
-    GamePhase,
-    gamePhase,
-    resetGameSession,
     teamAColorId,
     teamBColorId,
     teamAConfirmed,
     teamBConfirmed,
     teamColorPalette,
     setTeamColorByIndex,
-    teamAScore,
-    teamBScore,
   } from '../lib/stores/TeamGameStore';
   import { installGameSetupJacdacController } from '../lib/jacdac/stores';
 
@@ -80,13 +73,6 @@
     await connectToBus();
   };
 
-  const goToTrainingStep = () => {
-    if (!setupReady) {
-      return;
-    }
-    startCompetitiveRound();
-    navigate(Paths.DATA);
-  };
 </script>
 
 <main class="h-full w-full" class:hidden={$isLoading}>
@@ -98,17 +84,6 @@
       <p class="text-center text-gray-700 mb-6">
         Drej rotary encoder for at vælge farve, tryk på holdknappen for at bekræfte. Tryk holdknappen igen for at låse op og ændre farve.
       </p>
-
-      <div class="mb-6 flex flex-wrap items-center justify-center gap-3">
-        <button
-          type="button"
-          class="rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold text-slate-800 hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          on:click={goToTrainingStep}
-          disabled={!setupReady}
-          title={setupReady ? 'Gå til træning' : 'Alle tilslutninger skal være klar'}>
-          Gå til træning
-        </button>
-      </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch mb-6">
         <section class="rounded-2xl border border-gray-200 p-5 bg-slate-50/60">
@@ -210,19 +185,6 @@
         </section>
       </div>
 
-      <div class="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 flex flex-wrap items-center justify-between gap-2">
-        <span>Fase: {$gamePhase}</span>
-        <span>Score hold A: {$teamAScore}</span>
-        <span>Score hold B: {$teamBScore}</span>
-        <span>Hold A: {$teamAConfirmed ? 'Klar' : 'Afventer'}</span>
-        <span>Hold B: {$teamBConfirmed ? 'Klar' : 'Afventer'}</span>
-        <button
-          type="button"
-          class="rounded border border-slate-300 bg-white px-3 py-1 hover:bg-slate-100"
-          on:click={resetGameSession}>
-          Nulstil spil
-        </button>
-      </div>
     </div>
   </div>
 </main>
